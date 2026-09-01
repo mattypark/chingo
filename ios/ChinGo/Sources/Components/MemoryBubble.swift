@@ -3,10 +3,9 @@ import ChinGoDesign
 
 /// A memory, sitting on the map where it happened.
 ///
-/// This is the half of the product that has no equivalent in any incumbent. It is drawn as
-/// a small polaroid rather than a pin because a pin says "a place" and this says "a day".
+/// Drawn as a small polaroid rather than a pin: a pin says "a place", and this says "a day".
 struct MemoryBubble: View {
-    let pin: MemoryPin
+    let memory: MemoryRecord
     let action: () -> Void
 
     @State private var bob = false
@@ -17,14 +16,23 @@ struct MemoryBubble: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Ink.groundRaised)
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Ink.groundSunk)
-                        .padding(4)
-                        .padding(.bottom, 9)
-                    Image(systemName: "photo.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Ink.textFaint)
-                        .offset(y: -3)
+
+                    Group {
+                        if let image = PhotoStore.load(memory.photoFile) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            Ink.groundSunk.overlay {
+                                Image(systemName: "photo.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Ink.textFaint)
+                            }
+                        }
+                    }
+                    .frame(width: 40, height: 38)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .offset(y: -4)
                 }
                 .frame(width: 48, height: 54)
                 .rotationEffect(.degrees(-4))
@@ -46,6 +54,8 @@ struct MemoryBubble: View {
             guard !Motion.reduceMotion else { return }
             withAnimation(Motion.drift.delay(Double.random(in: 0...1.4))) { bob = true }
         }
-        .accessibilityLabel("Memory with \(pin.friendHandle) at \(pin.place), \(pin.agoDescription)")
+        .accessibilityLabel(
+            "Memory with \(memory.friendHandle) at \(memory.placeLabel), \(memory.agoDescription)"
+        )
     }
 }
