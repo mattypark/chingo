@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# Secrets — the real file never leaves this machine. Ship the .example instead.
+.env
+.env.*
+!.env.example
+ios/ChinGo/Secrets.xcconfig
+!ios/ChinGo/Secrets.xcconfig.example
+
+# Xcode / SPM
+ios/*.xcodeproj/
+ios/*.xcworkspace/
+DerivedData/
+.build/
+.swiftpm/
+*.xcuserstate
+xcuserdata/
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+.wrangler/
+.vercel/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Generated art candidates kept out of git until one is chosen
+assets/logo/candidates/
