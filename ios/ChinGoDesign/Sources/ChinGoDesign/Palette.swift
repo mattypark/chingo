@@ -53,7 +53,12 @@ public enum Ink {
     public static let mapWater = Color(hex: 0xA8D8D0)
     public static let mapRoad = Color(hex: 0xFFFDF7)
     public static let mapRoadCasing = Color(hex: 0xDDD5C2)
-    public static let mapBuilding = Color(hex: 0xE0D8C4)
+    public static let mapBuilding = Color(hex: 0xE4DCC8)
+    /// A minority of blocks, so a neighbourhood is not one flat tone.
+    public static let mapBuildingWarm = Color(hex: 0xDCCFB4)
+    /// The extruded side face. Buildings are drawn as a top over a darker side; without
+    /// this the map is a diagram rather than a place.
+    public static let mapBuildingSide = Color(hex: 0xC6B99C)
 
     // MARK: Depth
     //

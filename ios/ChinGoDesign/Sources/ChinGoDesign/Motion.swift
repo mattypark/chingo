@@ -36,6 +36,20 @@ public enum Motion {
 
     public static let breathe = Animation.easeInOut(duration: 2.6).repeatForever(autoreverses: true)
     public static let drift = Animation.easeInOut(duration: 7.0).repeatForever(autoreverses: true)
+
+    /// One guarded read of the system setting, so UIKit never leaks into a view file and
+    /// the package still compiles for macOS where the engine tests run.
+    ///
+    /// `UIAccessibility` is main-actor isolated under Swift 6, and every caller is a view
+    /// body or an `onAppear`, so the isolation is free rather than a constraint.
+    @MainActor
+    public static var reduceMotion: Bool {
+        #if canImport(UIKit)
+        UIAccessibility.isReduceMotionEnabled
+        #else
+        false
+        #endif
+    }
 }
 
 /// The phases of a reward. Drives `PhaseAnimator` so the three-beat shape is written once
@@ -76,14 +90,8 @@ public extension View {
     }
 
     /// Respect the system setting. A game is exactly the kind of app that forgets to.
-    ///
-    /// `UIAccessibility` is UIKit-only and this package also builds for macOS so the
-    /// engine tests can run without a simulator, hence the guard.
+    @MainActor
     func reducedMotionSafe(_ animation: Animation) -> Animation? {
-        #if canImport(UIKit)
-        UIAccessibility.isReduceMotionEnabled ? nil : animation
-        #else
-        animation
-        #endif
+        Motion.reduceMotion ? nil : animation
     }
 }
