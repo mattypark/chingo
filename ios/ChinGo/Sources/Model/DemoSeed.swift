@@ -18,7 +18,20 @@ enum DemoSeed {
     }
 
     static var opensAlbum: Bool {
-        ProcessInfo.processInfo.arguments.contains("-openAlbum")
+        opens == "album"
+    }
+
+    /// Which surface to land on, from `-open <name>`.
+    ///
+    /// Screenshotting a sheet otherwise means tapping through to it, which cannot be done
+    /// from the command line — so every surface added has to be taken on trust, which is
+    /// exactly how a screen ships with its own close button clipped off the bottom.
+    static var opens: String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-open"), args.index(after: i) < args.endIndex else {
+            return nil
+        }
+        return args[args.index(after: i)]
     }
 
     static func populate(_ context: ModelContext) {

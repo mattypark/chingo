@@ -13,12 +13,22 @@ import SwiftUI
 public struct CatchButton: View {
     private let enabled: Bool
     private let action: () -> Void
+    private let longPress: (() -> Void)?
 
     @State private var pulse = false
+    /// Bumped when a hold commits, so the haptic fires exactly then.
+    @State private var holdCommitted = 0
 
-    public init(enabled: Bool, action: @escaping () -> Void) {
+    /// `action` fires on a tap. `longPress`, when given, fires after a short hold and skips
+    /// the menu entirely — the shortcut for people already standing in front of someone.
+    public init(
+        enabled: Bool,
+        action: @escaping () -> Void,
+        longPress: (() -> Void)? = nil
+    ) {
         self.enabled = enabled
         self.action = action
+        self.longPress = longPress
     }
 
     public var body: some View {
@@ -46,6 +56,17 @@ public struct CatchButton: View {
         }
         .buttonStyle(SquashButtonStyle())
         .disabled(!enabled)
+        // 0.35s: long enough not to fire on a slow tap, short enough that nobody wonders
+        // whether it is working. Simultaneous, so the tap route is untouched.
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.35)
+                .onEnded { _ in
+                    guard enabled, let longPress else { return }
+                    holdCommitted += 1
+                    longPress()
+                }
+        )
+        .sensoryFeedback(.impact(weight: .heavy), trigger: holdCommitted)
         .onAppear {
             guard !Motion.reduceMotion else { return }
             withAnimation(Motion.breathe) { pulse = true }

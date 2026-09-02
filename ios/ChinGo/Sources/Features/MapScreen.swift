@@ -21,10 +21,25 @@ struct MapScreen: View {
     @State private var openMemory: MemoryRecord?
     @State private var showProfile = false
     @State private var showDeck = false
+    @State private var playerMenu = false
+    @State private var catchMenu = false
     @State private var showCatch = false
     @State private var showAlbum = false
     @State private var showAddFriend = false
     @State private var catchPulse = 0
+
+    /// Screen-relative direction of the nearest memory, for the bear to lean toward.
+    ///
+    /// Relative to the camera, not to north — the bear leans toward where the thing appears
+    /// on screen, which is the only frame of reference the person holding the phone has.
+    private var glanceBearing: Double? {
+        guard let nearest = visibleMemories.first else { return nil }
+        let dLon = nearest.longitude - here.lon
+        let dLat = nearest.latitude - here.lat
+        guard abs(dLon) > 1e-9 || abs(dLat) > 1e-9 else { return nil }
+        let absolute = atan2(dLon, dLat) * 180 / .pi
+        return absolute - camera.bearing
+    }
 
     private var here: (lat: Double, lon: Double) {
         let c = location.coordinateOrFallback
@@ -92,13 +107,65 @@ struct MapScreen: View {
             }
             .padding(.horizontal, Space.inset)
             .padding(.bottom, Space.margin)
+            .opacity(playerMenu || catchMenu ? 0 : 1)
+
+            if playerMenu {
+                RadialMenu(
+                    title: "You",
+                    options: [
+                        RadialOption(icon: "person.fill", label: "Profile", isPrimary: true) {
+                            showProfile = true
+                        },
+                        RadialOption(icon: "square.grid.2x2.fill", label: "Album") {
+                            showAlbum = true
+                        },
+                        RadialOption(icon: "person.badge.plus", label: "Add") {
+                            showAddFriend = true
+                        },
+                    ],
+                    anchor: .bottomLeading,
+                    onClose: { playerMenu = false }
+                )
+            }
+
+            if catchMenu {
+                RadialMenu(
+                    title: state.canCatch ? "Catch someone" : "Nobody nearby yet",
+                    options: [
+                        RadialOption(icon: "person.badge.plus", label: "By handle") {
+                            showAddFriend = true
+                        },
+                        // The camera is the middle and the largest, because it is what people
+                        // came for. Everything else on this menu is a fallback.
+                        RadialOption(icon: "camera.fill", label: "Take a picture", isPrimary: true) {
+                            catchPulse += 1
+                            showCatch = true
+                        },
+                        RadialOption(
+                            icon: state.discoverable ? "eye.fill" : "eye.slash.fill",
+                            label: state.discoverable ? "Out" : "Hidden"
+                        ) {
+                            state.discoverable.toggle()
+                        },
+                    ],
+                    anchor: .bottom,
+                    onClose: { catchMenu = false }
+                )
+            }
         }
         .background(Ink.mapLand)
         .task {
             location.requestPermission()
             location.start()
             #if DEBUG
-            if DemoSeed.opensAlbum { showAlbum = true }
+            switch DemoSeed.opens {
+            case "album": showAlbum = true
+            case "profile": showProfile = true
+            case "player": playerMenu = true
+            case "catch": catchMenu = true
+            case "deck": showDeck = true
+            default: break
+            }
             #endif
         }
         .onChange(of: catches.count, initial: true) { _, _ in
@@ -128,8 +195,7 @@ struct MapScreen: View {
             AlbumScreen()
         }
         .sheet(isPresented: $showProfile) {
-            ProfileSheet(state: state, catches: catches)
-                .presentationDetents([.height(540)])
+            ProfileScreen(state: state)
                 .presentationBackground(Ink.ground)
                 .presentationCornerRadius(Radius.surface)
         }
@@ -222,8 +288,12 @@ struct MapScreen: View {
             // Bottom-left is you. On a map screen it is the one control whose position
             // people learn without being told, which is why every game in this shape puts
             // the player's own identity there.
-            ProfileOrb(level: state.level, progress: state.levelProgress) {
-                showProfile = true
+            MascotOrb(
+                level: state.level,
+                progress: state.levelProgress,
+                glanceTowards: glanceBearing
+            ) {
+                withAnimation(Motion.arrive) { playerMenu = true }
             }
 
             Spacer()
@@ -238,10 +308,17 @@ struct MapScreen: View {
                     }
                     .transition(.scale.combined(with: .opacity))
                 }
-                CatchButton(enabled: state.canCatch) {
-                    catchPulse += 1
-                    showCatch = true
-                }
+                CatchButton(
+                    enabled: state.canCatch,
+                    action: { withAnimation(Motion.arrive) { catchMenu = true } },
+                    longPress: {
+                        // Straight past the menu to the camera. The haptic fires at the moment
+                        // it commits, which is how a hidden shortcut gets discovered — by
+                        // feel, without anyone having to be told it exists.
+                        catchPulse += 1
+                        showCatch = true
+                    }
+                )
                 .rewardBeat(on: catchPulse)
                 .feedback(.caught, on: catchPulse)
             }
