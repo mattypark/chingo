@@ -33,13 +33,36 @@ struct ChinGoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MapScreen(state: state, location: location)
+            RootView(state: state, location: location)
                 .preferredColorScheme(.light)   // one committed look until the theme pass
         }
         // Local-first: a catch is real on this device the moment it happens, with no
         // account and no network. Sync is something that catches up afterwards, never
         // something the moment depends on.
         .modelContainer(container)
+    }
+}
+
+/// The map, with the opening laid over it.
+///
+/// The map is built and running underneath from the first frame rather than after the splash
+/// — so by the time the ground lifts, tiles have already loaded and the world is there. A
+/// splash that hides a loading screen is just a loading screen wearing a hat.
+private struct RootView: View {
+    let state: MapState
+    let location: LocationService
+
+    @State private var showingSplash = true
+
+    var body: some View {
+        ZStack {
+            MapScreen(state: state, location: location)
+
+            if showingSplash {
+                SplashView { showingSplash = false }
+                    .transition(.identity)   // SplashView animates its own exit
+            }
+        }
     }
 }
 

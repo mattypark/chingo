@@ -35,6 +35,10 @@ targets:
       path: ChinGo/Info.plist
       properties:
         CFBundleDisplayName: ChinGo
+        # Deliberately just a colour, with no logo on it. Apple requires the launch screen
+        # to be nearly identical to the first screen, and SplashView's first frame is this
+        # exact flat field -- which is what makes the handoff invisible. The mascot then
+        # animates in from code, where branding is allowed.
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
