@@ -17,7 +17,10 @@ struct MapScreen: View {
 
     let location: LocationService
 
+    @State private var camera = MapCamera()
     @State private var openMemory: MemoryRecord?
+    @State private var showProfile = false
+    @State private var showDeck = false
     @State private var showCatch = false
     @State private var showAlbum = false
     @State private var showAddFriend = false
@@ -47,9 +50,28 @@ struct MapScreen: View {
         ZStack {
             MapLibreMap(
                 coordinate: location.coordinateOrFallback,
-                course: location.course
+                bearing: camera.bearing,
+                pitch: camera.pitch
             )
             .ignoresSafeArea()
+
+            // Look around: drag horizontally to turn, vertically to raise or lower the view.
+            //
+            // This is a transparent SwiftUI layer rather than a gesture on the map view.
+            // MLNMapView keeps its own recognisers attached even with every interaction
+            // switched off, and they can swallow the touch before SwiftUI sees it — a
+            // gesture that silently never fires is the worst kind to debug. A plain
+            // Color.clear always receives it.
+            //
+            // It sits below the pins and the chrome in the stack, so those still take taps.
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 4)
+                        .onChanged { camera.drag($0.translation) }
+                        .onEnded { _ in camera.endDrag() }
+                )
+                .ignoresSafeArea()
             memoryLayer
             PlayerPuck(level: state.level, progress: state.levelProgress)
 
@@ -58,8 +80,8 @@ struct MapScreen: View {
                 Spacer()
                 bottomBar
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 26)
+            .padding(.horizontal, Space.inset)
+            .padding(.bottom, Space.margin)
         }
         .background(Ink.mapLand)
         .task {
@@ -71,6 +93,9 @@ struct MapScreen: View {
         }
         .onChange(of: catches.count, initial: true) { _, _ in
             state.recompute(from: catches)
+        }
+        .onChange(of: location.course) { _, course in
+            camera.follow(course: course)
         }
         .sheet(item: $openMemory) { memory in
             MemorySheet(memory: memory) { state.award(.memoryRevisited) }
@@ -91,6 +116,21 @@ struct MapScreen: View {
         }
         .sheet(isPresented: $showAlbum) {
             AlbumScreen()
+        }
+        .sheet(isPresented: $showProfile) {
+            ProfileSheet(state: state, catches: catches)
+                .presentationDetents([.height(460)])
+                .presentationBackground(Ink.ground)
+                .presentationCornerRadius(Radius.surface)
+        }
+        .sheet(isPresented: $showDeck) {
+            DeckSheet(
+                onAlbum: { showDeck = false; showAlbum = true },
+                onAddFriend: { showDeck = false; showAddFriend = true }
+            )
+            .presentationDetents([.height(380)])
+            .presentationBackground(Ink.ground)
+            .presentationCornerRadius(Radius.surface)
         }
     }
 
@@ -169,16 +209,16 @@ struct MapScreen: View {
 
     private var bottomBar: some View {
         HStack(alignment: .bottom) {
-            FloatingOrb(action: { showAlbum = true }) {
-                Image(systemName: "square.grid.2x2.fill")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Ink.textSoft)
+            // Bottom-left is you. On a map screen it is the one control whose position
+            // people learn without being told, which is why every game in this shape puts
+            // the player's own identity there.
+            ProfileOrb(level: state.level, progress: state.levelProgress) {
+                showProfile = true
             }
-            .accessibilityLabel("Album")
 
             Spacer()
 
-            VStack(spacing: 10) {
+            VStack(spacing: Space.tight) {
                 if let place = location.placeLabel {
                     FloatingPill {
                         Text(place)
@@ -193,18 +233,85 @@ struct MapScreen: View {
                     showCatch = true
                 }
                 .rewardBeat(on: catchPulse)
+                .feedback(.caught, on: catchPulse)
             }
 
             Spacer()
 
-            FloatingOrb(action: { showAddFriend = true }) {
-                Image(systemName: "person.badge.plus")
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(Ink.textSoft)
+            // Bottom-right is everything you can do. One entry point rather than a row of
+            // orbs, so the map keeps the screen and the actions stay one thumb away.
+            VStack(spacing: Space.tight) {
+                if !camera.isFollowingCourse {
+                    // Only appears once you have actually turned the view. A compass that is
+                    // always on screen is a compass nobody reads.
+                    FloatingOrb(diameter: 44, action: { camera.recenter(course: location.course) }) {
+                        Image(systemName: "location.north.line.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Ink.signal)
+                            .rotationEffect(.degrees(-camera.bearing))
+                    }
+                    .accessibilityLabel("Face the way you are walking")
+                    .transition(.scale.combined(with: .opacity))
+                }
+
+                FloatingOrb(action: { showDeck = true }) {
+                    Image(systemName: "square.stack.3d.up.fill")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(Ink.textSoft)
+                }
+                .accessibilityLabel("Your friends and what you can do")
             }
-            .accessibilityLabel("Add someone by handle")
         }
         .animation(Motion.surface, value: location.placeLabel)
+        .animation(Motion.surface, value: state.canCatch)
+        .animation(Motion.surface, value: camera.isFollowingCourse)
+    }
+}
+
+/// You, bottom-left.
+private struct ProfileOrb: View {
+    let level: Int
+    let progress: Double
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(Ink.groundRaised)
+                    .elevated(.float)
+
+                Circle()
+                    .stroke(Ink.groundSunk, lineWidth: 3)
+                    .padding(2)
+
+                Circle()
+                    .trim(from: 0, to: max(0.02, progress))
+                    .stroke(Ink.signal, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .padding(2)
+
+                Image(systemName: "person.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Ink.textSoft)
+
+                Text("\(level)")
+                    .font(.custom(Typeface.bagel, size: 11))
+                    .foregroundStyle(Ink.onSignal)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Ink.signal))
+                    .overlay(Capsule().stroke(Ink.groundRaised, lineWidth: 2))
+                    .offset(y: 26)
+            }
+            // Tall enough to contain the badge hanging below the circle. Sizing this to the
+            // circle alone lets the badge fall outside the frame, where the stack clips it
+            // and — at the bottom-left corner — the screen edge cuts it in half.
+            .frame(width: 58, height: 76, alignment: .top)
+        }
+        .buttonStyle(SquashButtonStyle())
+        .hitTarget()
+        .accessibilityLabel("You, level \(level)")
     }
 }
 

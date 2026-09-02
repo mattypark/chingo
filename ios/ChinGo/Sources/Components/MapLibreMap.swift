@@ -23,10 +23,11 @@ struct MapLibreMap: UIViewRepresentable {
 
     /// Where to point the camera.
     var coordinate: CLLocationCoordinate2D
-    /// Direction of travel in degrees, or nil to keep the map north-up.
-    var course: CLLocationDirection?
+    /// Compass bearing the camera faces. Driven by `MapCamera`, which is either following
+    /// the direction of travel or being dragged by the user.
+    var bearing: CLLocationDirection
     /// How far back the camera is raked. 0 is a flat document; 60 is standing in a world.
-    var pitch: CGFloat = 58
+    var pitch: CGFloat
     /// Street level. Converted to a camera altitude through MapLibre's own helper, because
     /// altitude and zoom are only equivalent at a given pitch and latitude — computing it by
     /// hand is how a camera ends up either underground or looking at the whole planet.
@@ -44,12 +45,16 @@ struct MapLibreMap: UIViewRepresentable {
 
         // The player stays put and the world moves. That single decision is most of what
         // makes a map screen feel like a game rather than a navigation tool.
+        // Every camera gesture is handled by MapCamera and applied through setCamera, so
+        // MapLibre's own gesture recognisers are all off. Leaving them on means two things
+        // driving one camera, which shows up as the view snapping back mid-drag.
+        //
+        // Rotation in particular has to be ours: MapLibre's built-in rotate is a two-finger
+        // twist, and looking around should cost one thumb.
         map.allowsScrolling = false
         map.allowsRotating = false
         map.allowsTilting = false
-        // Zoom stays available: pinching to see further down the street is the one gesture
-        // that is genuinely useful here.
-        map.allowsZooming = true
+        map.allowsZooming = false
 
         map.compassView.isHidden = true
         map.logoView.isHidden = true
@@ -57,20 +62,19 @@ struct MapLibreMap: UIViewRepresentable {
         // also the only affordance telling a curious user where the map came from.
         map.attributionButton.tintColor = UIColor(Ink.textFaint)
 
-        map.setCamera(camera(for: map, heading: course ?? 0), animated: false)
+        map.setCamera(camera(for: map, heading: bearing), animated: false)
 
         return map
     }
 
     func updateUIView(_ map: MLNMapView, context: Context) {
-        // Animated, and slowly. A camera that snaps to each GPS fix reads as jitter even when
-        // the fixes are good; easing between them is what makes walking look like walking.
-        //
-        // Heading falls back to whatever the map currently has rather than to north, so that
-        // stopping does not spin the world back round.
+        // A drag must land on the same frame it happens on, or looking around feels like
+        // steering a boat. Position changes still ease, because a camera that snaps to every
+        // GPS fix reads as jitter even when the fixes are good.
+        let turning = abs(map.camera.heading - bearing) > 0.5 || abs(map.camera.pitch - pitch) > 0.5
         map.setCamera(
-            camera(for: map, heading: course ?? map.camera.heading),
-            withDuration: 0.85,
+            camera(for: map, heading: bearing),
+            withDuration: turning ? 0 : 0.85,
             animationTimingFunction: nil
         )
     }
