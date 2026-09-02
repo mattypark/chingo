@@ -19,12 +19,8 @@ struct AddFriendSheet: View {
     private var canAdd: Bool { !handle.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
-        VStack(spacing: 18) {
-            Text("Add by handle")
-                .font(.chinTitle)
-                .foregroundStyle(Ink.text)
-                .padding(.top, 26)
-
+        SheetShell("Add by handle") {
+        VStack(spacing: Space.step) {
             Text("They tell you their handle. No search, no directory — you can only add people who hand it to you.")
                 .font(.chinFootnote)
                 .foregroundStyle(Ink.textSoft)
@@ -55,10 +51,9 @@ struct AddFriendSheet: View {
             }
             .buttonStyle(SquashButtonStyle())
             .disabled(!canAdd)
-            .padding(.horizontal, 22)
-            .padding(.bottom, 12)
+            .padding(.horizontal, Space.margin)
         }
-        .background(Ink.ground)
+        }
     }
 
     private func add() {

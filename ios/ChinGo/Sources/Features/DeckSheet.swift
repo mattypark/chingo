@@ -16,14 +16,8 @@ struct DeckSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        SheetShell("What now") {
         VStack(spacing: 0) {
-            Text("What now")
-                .font(.chinTitle)
-                .foregroundStyle(Ink.text)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, Space.margin)
-                .padding(.bottom, Space.step)
-
             row(
                 icon: "square.grid.2x2.fill",
                 title: "Album",
@@ -37,9 +31,10 @@ struct DeckSheet: View {
                 action: onAddFriend
             )
 
-            Spacer(minLength: Space.step)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, Space.margin)
+        }
     }
 
     private func row(

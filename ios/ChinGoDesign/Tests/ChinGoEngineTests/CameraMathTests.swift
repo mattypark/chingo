@@ -45,6 +45,42 @@ struct CameraMathTests {
         }
     }
 
+    @Test("A pinch that does not move does not zoom")
+    func pinchIdentity() {
+        #expect(CameraMath.zoom(from: 17, pinchedBy: 1) == 17)
+    }
+
+    @Test("Zoom is logarithmic, not additive")
+    func pinchIsLogarithmic() {
+        // Doubling the pinch scale is exactly one zoom level, at either end of the range.
+        // Adding the raw scale instead makes the map lurch at one end and crawl at the other.
+        #expect(CameraMath.zoom(from: 16, pinchedBy: 2) == 17)
+        #expect(CameraMath.zoom(from: 17, pinchedBy: 2) == 18)
+        #expect(CameraMath.zoom(from: 17, pinchedBy: 0.5) == 16)
+    }
+
+    @Test("Zoom stays inside its range whatever the pinch")
+    func zoomClamps() {
+        for scale in stride(from: 0.001, through: 60.0, by: 0.37) {
+            let z = CameraMath.zoom(from: CameraMath.defaultZoom, pinchedBy: scale)
+            #expect(CameraMath.zoomRange.contains(z), "scale \(scale) produced \(z)")
+        }
+    }
+
+    @Test("A degenerate pinch scale does not produce a broken zoom")
+    func pinchGuardsZero() {
+        // MagnifyGesture can report 0 on the first event of a gesture, and log2(0) is
+        // -infinity, which silently poisons the camera altitude rather than crashing.
+        #expect(CameraMath.zoom(from: 17, pinchedBy: 0) == 17)
+        #expect(CameraMath.zoom(from: 17, pinchedBy: -3) == 17)
+    }
+
+    @Test("A city opens close enough to read the street")
+    func defaultZoomIsInRange() {
+        #expect(CameraMath.zoomRange.contains(CameraMath.defaultZoom))
+        #expect(CameraMath.defaultZoom > 17)
+    }
+
     @Test("Recentring turns the short way round")
     func shortestTurn() {
         #expect(CameraMath.shortestTurn(from: 359, to: 1) == 2)

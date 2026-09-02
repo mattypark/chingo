@@ -10,7 +10,6 @@ import ChinGoEngine
 /// the number of friends you have is the least interesting fact about them.
 struct AlbumScreen: View {
     @Query(sort: \FriendRecord.metDate, order: .reverse) private var friends: [FriendRecord]
-    @Environment(\.dismiss) private var dismiss
     @State private var selected: FriendRecord?
 
     private var ordered: [FriendRecord] {
@@ -20,23 +19,11 @@ struct AlbumScreen: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if friends.isEmpty {
-                    empty
-                } else {
-                    grid
-                }
-            }
-            .background(Ink.ground)
-            .navigationTitle("Album")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .font(.chinCallout)
-                        .foregroundStyle(Ink.signal)
-                }
+        SheetShell("Album") {
+            if friends.isEmpty {
+                empty
+            } else {
+                grid
             }
         }
         .sheet(item: $selected) { friend in

@@ -28,10 +28,10 @@ struct MapLibreMap: UIViewRepresentable {
     var bearing: CLLocationDirection
     /// How far back the camera is raked. 0 is a flat document; 60 is standing in a world.
     var pitch: CGFloat
-    /// Street level. Converted to a camera altitude through MapLibre's own helper, because
+    /// How close in. Converted to a camera altitude through MapLibre's own helper, because
     /// altitude and zoom are only equivalent at a given pitch and latitude — computing it by
     /// hand is how a camera ends up either underground or looking at the whole planet.
-    var zoom: Double = 16.5
+    var zoom: Double
 
     func makeUIView(context: Context) -> MLNMapView {
         let style = Bundle.main.url(forResource: "chingo-style", withExtension: "json")
@@ -67,14 +67,28 @@ struct MapLibreMap: UIViewRepresentable {
         return map
     }
 
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// Holds the zoom the map was last given. `MLNMapView.zoomLevel` is derived from altitude
+    /// and drifts by a hair, so comparing against it directly reports a change every frame.
+    final class Coordinator {
+        var lastZoom: Double = .nan
+    }
+
     func updateUIView(_ map: MLNMapView, context: Context) {
+        let lastZoom = context.coordinator.lastZoom
+        context.coordinator.lastZoom = zoom
         // A drag must land on the same frame it happens on, or looking around feels like
         // steering a boat. Position changes still ease, because a camera that snaps to every
         // GPS fix reads as jitter even when the fixes are good.
-        let turning = abs(map.camera.heading - bearing) > 0.5 || abs(map.camera.pitch - pitch) > 0.5
+        // Any live gesture lands on the frame it happens on. Easing a pinch makes the map
+        // feel like it is catching up with the fingers rather than following them.
+        let gesturing = abs(map.camera.heading - bearing) > 0.5
+            || abs(map.camera.pitch - pitch) > 0.5
+            || abs(lastZoom - zoom) > 0.001
         map.setCamera(
             camera(for: map, heading: bearing),
-            withDuration: turning ? 0 : 0.85,
+            withDuration: gesturing ? 0 : 0.85,
             animationTimingFunction: nil
         )
     }

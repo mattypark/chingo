@@ -16,6 +16,8 @@ final class MapCamera {
     private(set) var bearing: CLLocationDirection = 0
     /// How far the camera is raked back. 0 looks straight down; 70 is nearly at street level.
     private(set) var pitch: CGFloat = 58
+    /// How close in. A city opens at `CameraMath.defaultZoom`.
+    private(set) var zoom: Double = CameraMath.defaultZoom
 
     /// True while the camera follows the direction of travel. A drag hands control to the
     /// user and it stays handed over until they explicitly ask for it back — a camera that
@@ -24,6 +26,8 @@ final class MapCamera {
 
     /// Bearing and pitch at the moment the current drag began.
     private var dragOrigin: (bearing: CLLocationDirection, pitch: CGFloat)?
+    /// Zoom at the moment the current pinch began.
+    private var pinchOrigin: Double?
 
     func drag(_ translation: CGSize) {
         let origin = dragOrigin ?? (bearing, pitch)
@@ -38,7 +42,20 @@ final class MapCamera {
         dragOrigin = nil
     }
 
+    func pinch(_ scale: CGFloat) {
+        let origin = pinchOrigin ?? zoom
+        pinchOrigin = origin
+        zoom = CameraMath.zoom(from: origin, pinchedBy: Double(scale))
+    }
+
+    func endPinch() {
+        pinchOrigin = nil
+    }
+
     /// Hand the camera back to the direction of travel.
+    ///
+    /// Zoom is deliberately left alone. Someone who zoomed out to get their bearings did not
+    /// ask to be pushed back in, and a recentre that also re-zooms feels like being overruled.
     func recenter(course: CLLocationDirection?) {
         isFollowingCourse = true
         pitch = 58

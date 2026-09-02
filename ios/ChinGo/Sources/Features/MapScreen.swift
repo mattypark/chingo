@@ -51,7 +51,8 @@ struct MapScreen: View {
             MapLibreMap(
                 coordinate: location.coordinateOrFallback,
                 bearing: camera.bearing,
-                pitch: camera.pitch
+                pitch: camera.pitch,
+                zoom: camera.zoom
             )
             .ignoresSafeArea()
 
@@ -70,6 +71,15 @@ struct MapScreen: View {
                     DragGesture(minimumDistance: 4)
                         .onChanged { camera.drag($0.translation) }
                         .onEnded { _ in camera.endDrag() }
+                )
+                // Pinch to zoom. Simultaneous rather than exclusive, because the two
+                // gestures genuinely co-occur — fingers rarely pinch without also sliding a
+                // little, and making them exclusive means whichever recogniser wins first
+                // locks the other out for the rest of the gesture.
+                .simultaneousGesture(
+                    MagnifyGesture()
+                        .onChanged { camera.pinch($0.magnification) }
+                        .onEnded { _ in camera.endPinch() }
                 )
                 .ignoresSafeArea()
             memoryLayer
@@ -99,7 +109,7 @@ struct MapScreen: View {
         }
         .sheet(item: $openMemory) { memory in
             MemorySheet(memory: memory) { state.award(.memoryRevisited) }
-                .presentationDetents([.height(470)])
+                .presentationDetents([.height(560)])
                 .presentationBackground(Ink.ground)
                 .presentationCornerRadius(30)
         }
@@ -111,7 +121,7 @@ struct MapScreen: View {
         }
         .sheet(isPresented: $showAddFriend) {
             AddFriendSheet(cell: cell, placeLabel: location.placeLabel)
-                .presentationDetents([.height(400)])
+                .presentationDetents([.height(470)])
                 .presentationCornerRadius(30)
         }
         .sheet(isPresented: $showAlbum) {
@@ -119,7 +129,7 @@ struct MapScreen: View {
         }
         .sheet(isPresented: $showProfile) {
             ProfileSheet(state: state, catches: catches)
-                .presentationDetents([.height(460)])
+                .presentationDetents([.height(540)])
                 .presentationBackground(Ink.ground)
                 .presentationCornerRadius(Radius.surface)
         }
@@ -128,7 +138,7 @@ struct MapScreen: View {
                 onAlbum: { showDeck = false; showAlbum = true },
                 onAddFriend: { showDeck = false; showAddFriend = true }
             )
-            .presentationDetents([.height(380)])
+            .presentationDetents([.height(440)])
             .presentationBackground(Ink.ground)
             .presentationCornerRadius(Radius.surface)
         }
@@ -326,6 +336,7 @@ struct MemorySheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        SheetShell {
         VStack(spacing: 0) {
             Group {
                 if let image = PhotoStore.load(memory.photoFile) {
@@ -374,8 +385,8 @@ struct MemorySheet: View {
                     .background(Capsule().fill(Ink.signal))
             }
             .buttonStyle(SquashButtonStyle())
-            .padding(.bottom, 8)
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, Space.margin)
+        }
     }
 }

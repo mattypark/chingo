@@ -32,9 +32,9 @@ struct CatchSheet: View {
     }
 
     var body: some View {
+        SheetShell("Catch") {
         VStack(spacing: 0) {
             photoWell
-                .padding(.top, 22)
 
             VStack(alignment: .leading, spacing: 14) {
                 field("Their handle", text: $handle, placeholder: "sunny")
@@ -64,10 +64,9 @@ struct CatchSheet: View {
             }
             .buttonStyle(SquashButtonStyle())
             .disabled(!canSave)
-            .padding(.bottom, 10)
         }
-        .padding(.horizontal, 22)
-        .background(Ink.ground)
+        .padding(.horizontal, Space.margin)
+        }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image = $0 }
                 .ignoresSafeArea()
