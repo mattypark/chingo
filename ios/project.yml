@@ -102,6 +102,12 @@ targets:
         ENABLE_USER_SCRIPT_SANDBOXING: YES
         SWIFT_UPCOMING_FEATURE_CONCURRENCY: YES
         CODE_SIGN_STYLE: Automatic
+        # The team Xcode is actually signed into on this machine -- the same one Fitti
+        # ships with, which already has a wildcard profile and the devices registered.
+        # The personal Apple Development cert in the keychain (274Z73Q329) is NOT usable:
+        # its Apple ID is not added in Xcode's Accounts, so builds fail with "No Account
+        # for Team", which does not obviously mean "sign in".
+        DEVELOPMENT_TEAM: R43H5332KH
         GENERATE_INFOPLIST_FILE: NO
 
 # XcodeGen emits no shared scheme unless one is declared, and xcodebuild then refuses to

@@ -64,7 +64,8 @@ struct AlbumScreen: View {
     }
 
     private var empty: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Space.tight) {
+            Spacer()
             Text("Nobody yet")
                 .font(.chinTitle)
                 .foregroundStyle(Ink.text)
@@ -72,9 +73,20 @@ struct AlbumScreen: View {
                 .font(.chinHand)
                 .foregroundStyle(Ink.textSoft)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal, Space.section)
+            Spacer()
+            // An empty state is where an app is most obviously a database with no rows in
+            // it. The bear leaning in from the bottom is the cheapest possible way to make
+            // it read as a room nobody has arrived at yet.
+            Image("CornerBear")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 200)
+                .offset(y: 46)
+                .accessibilityHidden(true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 40)
+        .clipped()
     }
 }
 
