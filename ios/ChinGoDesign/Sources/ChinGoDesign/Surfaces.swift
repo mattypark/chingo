@@ -15,7 +15,7 @@ public struct FloatingSurface<Content: View>: View {
     private let radius: CGFloat
     private let content: Content
 
-    public init(radius: CGFloat = 26, @ViewBuilder content: () -> Content) {
+    public init(radius: CGFloat = Radius.surface, @ViewBuilder content: () -> Content) {
         self.radius = radius
         self.content = content()
     }
@@ -25,8 +25,10 @@ public struct FloatingSurface<Content: View>: View {
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .fill(Ink.groundRaised)
-                    .shadow(color: Ink.shade, radius: 18, x: 0, y: 8)
-                    .shadow(color: Ink.shadeSoft, radius: 3, x: 0, y: 1)
+                    .elevated(.card)
+                    // A second, tight shadow directly under the edge. One shadow gives a
+                    // surface height; the contact shadow is what stops it looking pasted on.
+                    .elevated(.low)
             }
     }
 }
@@ -41,13 +43,14 @@ public struct FloatingPill<Content: View>: View {
 
     public var body: some View {
         content
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.horizontal, Space.snug)
+            .padding(.vertical, Space.tight)
             .background {
                 Capsule(style: .continuous)
                     .fill(Ink.groundRaised)
-                    .shadow(color: Ink.shade, radius: 10, x: 0, y: 4)
+                    .elevated(.float)
             }
+            .frame(minHeight: Space.minimumHitTarget)
     }
 }
 
@@ -77,12 +80,13 @@ public struct FloatingOrb<Content: View>: View {
                 .background {
                     Circle()
                         .fill(tint)
-                        .shadow(color: Ink.shade, radius: 12, x: 0, y: 5)
+                        .elevated(.float)
                 }
         }
         .buttonStyle(SquashButtonStyle())
-        // 54pt clears the 44pt minimum with room for gloves and thumbs in motion —
-        // this app is used while walking.
+        // 54pt clears the 44pt minimum with room for thumbs in motion — this app is used
+        // while walking, where the target is moving relative to the hand.
+        .hitTarget()
         .accessibilityAddTraits(.isButton)
     }
 }
