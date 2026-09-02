@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -39,6 +37,8 @@
 	<string>ChinGo confirms you and a friend are really standing together before it lets you catch each other.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ChinGo shows the places you and your friends have been, and lets you catch friends you are standing next to. Your location is never shared with anyone unless you turn yourself visible, and it is never precise to other people.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>ChinGo uses motion to tell whether you are walking or standing still, so your character on the map moves the way you do.</string>
 	<key>NSNearbyInteractionUsageDescription</key>
 	<string>ChinGo uses the U1 chip to tell whether a friend is right next to you.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

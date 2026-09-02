@@ -21,6 +21,13 @@ final class LocationService: NSObject {
     private(set) var coordinate: CLLocationCoordinate2D?
     private(set) var currentCell: GeoCell?
     private(set) var authorization: CLAuthorizationStatus = .notDetermined
+    /// Direction of travel, in degrees. Nil while stationary.
+    ///
+    /// `course` is meaningless near zero speed — CoreLocation reports whatever the last
+    /// scrap of movement suggested — so it is only published above a walking threshold and
+    /// only when CoreLocation itself says the value is trustworthy. Rotating a map from an
+    /// untrusted course is how a stationary phone ends up spinning the whole world.
+    private(set) var course: CLLocationDirection?
     /// A human-readable name for where you are, for the label on a catch. Reverse geocoding
     /// is rate-limited by the system, so it is refreshed per cell rather than per fix.
     private(set) var placeLabel: String?
@@ -76,6 +83,11 @@ extension LocationService: CLLocationManagerDelegate {
         guard let last = locations.last else { return }
         Task { @MainActor in
             coordinate = last.coordinate
+
+            let moving = last.speed > 0.4                 // m/s, about a slow walk
+            let trustworthy = last.courseAccuracy >= 0 && last.courseAccuracy < 45
+            course = (moving && trustworthy) ? last.course : nil
+
             let cell = GeoCell(
                 latitude: last.coordinate.latitude,
                 longitude: last.coordinate.longitude

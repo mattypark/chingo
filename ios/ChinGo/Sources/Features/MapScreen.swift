@@ -45,7 +45,11 @@ struct MapScreen: View {
 
     var body: some View {
         ZStack {
-            MapSurface()
+            MapLibreMap(
+                coordinate: location.coordinateOrFallback,
+                course: location.course
+            )
+            .ignoresSafeArea()
             memoryLayer
             PlayerPuck(level: state.level, progress: state.levelProgress)
 

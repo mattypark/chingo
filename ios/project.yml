@@ -8,6 +8,12 @@ options:
 packages:
   ChinGoDesign:
     path: ChinGoDesign
+  # The renderer only. The official swiftui-dsl wrapper is pre-1.0 and consumers pin it to
+  # `main`, which means breaking API changes land with no semver warning; MLNMapView is
+  # wrapped by hand in MapLibreMap.swift instead, for one versioned dependency rather than two.
+  MapLibre:
+    url: https://github.com/maplibre/maplibre-gl-native-distribution
+    from: 6.0.0
 
 targets:
   ChinGo:
@@ -23,6 +29,8 @@ targets:
       - package: ChinGoDesign
       - package: ChinGoDesign
         product: ChinGoEngine
+      - package: MapLibre
+        product: MapLibre
     info:
       path: ChinGo/Info.plist
       properties:
@@ -31,11 +39,10 @@ targets:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        # Without this, ProMotion caps the app at 60fps and every spring in the design
-        # system renders as a cheaper version of itself. On a screen whose whole job is
-        # a live map under floating chrome, that is the difference between the map
-        # tracking and the map stuttering.
-        CADisableMinimumFrameDurationOnPhone: true
+        # Deliberately NOT set. Unlocking 120Hz on a screen that renders a tilted vector
+        # map continuously alongside GPS is a straight battery cost, and battery drain is
+        # something reviewers and users both notice on location apps. 60fps is enough for
+        # a map that moves at walking pace.
 
         # Bare filenames. The build flattens Resources/Fonts and copies both faces to the
         # bundle root; a path that does not resolve fails silently and SwiftUI quietly
@@ -62,6 +69,9 @@ targets:
           catch each other.
         NSNearbyInteractionUsageDescription: >-
           ChinGo uses the U1 chip to tell whether a friend is right next to you.
+        NSMotionUsageDescription: >-
+          ChinGo uses motion to tell whether you are walking or standing still, so your
+          character on the map moves the way you do.
 
         # Declaring this false skips the export-compliance questionnaire on every
         # TestFlight upload. True only if non-exempt cryptography is ever added; HTTPS
