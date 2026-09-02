@@ -20,13 +20,15 @@ struct MapScreen: View {
     @State private var camera = MapCamera()
     @State private var openMemory: MemoryRecord?
     @State private var showProfile = false
-    @State private var showDeck = false
-    @State private var playerMenu = false
     @State private var catchMenu = false
+    @State private var deckMenu = false
     @State private var showCatch = false
     @State private var showAlbum = false
     @State private var showAddFriend = false
     @State private var catchPulse = 0
+    /// The photo currently flying into the album, if any.
+    @State private var flying: UIImage?
+    @State private var flown = false
 
     /// Screen-relative direction of the nearest memory, for the bear to lean toward.
     ///
@@ -107,25 +109,49 @@ struct MapScreen: View {
             }
             .padding(.horizontal, Space.inset)
             .padding(.bottom, Space.margin)
-            .opacity(playerMenu || catchMenu ? 0 : 1)
+            .opacity(catchMenu || deckMenu ? 0 : 1)
 
-            if playerMenu {
-                RadialMenu(
-                    title: "You",
+            if deckMenu {
+                ListMenu(
                     options: [
-                        RadialOption(icon: "person.fill", label: "Profile", isPrimary: true) {
-                            showProfile = true
-                        },
-                        RadialOption(icon: "square.grid.2x2.fill", label: "Album") {
-                            showAlbum = true
-                        },
-                        RadialOption(icon: "person.badge.plus", label: "Add") {
-                            showAddFriend = true
-                        },
+                        RadialOption(icon: "person.fill", label: "Profile") { showProfile = true },
+                        RadialOption(icon: "square.grid.2x2.fill", label: "Album") { showAlbum = true },
+                        RadialOption(icon: "person.badge.plus", label: "Add someone") { showAddFriend = true },
+                        RadialOption(
+                            icon: state.discoverable ? "eye.fill" : "eye.slash.fill",
+                            label: state.discoverable ? "You're out" : "You're hidden"
+                        ) { state.discoverable.toggle() },
                     ],
-                    anchor: .bottomLeading,
-                    onClose: { playerMenu = false }
+                    onClose: { deckMenu = false }
                 )
+            }
+
+            // The photo going where photos go. Without it a catch ends with a sheet closing
+            // and nothing to show for it, and the album becomes a place things are simply
+            // discovered in later rather than sent to.
+            if let flying {
+                GeometryReader { geo in
+                    Image(uiImage: flying)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(
+                            width: flown ? 44 : 210,
+                            height: flown ? 44 : 260
+                        )
+                        .clipShape(RoundedRectangle(
+                            cornerRadius: flown ? Radius.control : Radius.card,
+                            style: .continuous
+                        ))
+                        .elevated(.card)
+                        .rotationEffect(.degrees(flown ? -12 : 0))
+                        .opacity(flown ? 0 : 1)
+                        .position(
+                            x: flown ? Space.inset + 29 : geo.size.width / 2,
+                            y: flown ? geo.size.height - Space.margin - 38 : geo.size.height / 2
+                        )
+                }
+                .allowsHitTesting(false)
+                .ignoresSafeArea()
             }
 
             if catchMenu {
@@ -148,7 +174,6 @@ struct MapScreen: View {
                             state.discoverable.toggle()
                         },
                     ],
-                    anchor: .bottom,
                     onClose: { catchMenu = false }
                 )
             }
@@ -161,9 +186,8 @@ struct MapScreen: View {
             switch DemoSeed.opens {
             case "album": showAlbum = true
             case "profile": showProfile = true
-            case "player": playerMenu = true
             case "catch": catchMenu = true
-            case "deck": showDeck = true
+            case "deck": deckMenu = true
             default: break
             }
             #endif
@@ -181,7 +205,24 @@ struct MapScreen: View {
                 .presentationCornerRadius(30)
         }
         .sheet(isPresented: $showCatch) {
-            CatchSheet(cell: cell, placeLabel: location.placeLabel, coordinate: here)
+            CatchSheet(
+                cell: cell,
+                placeLabel: location.placeLabel,
+                coordinate: here,
+                onSaved: { image in
+                    guard let image else { return }
+                    // Held until the sheet is actually gone. Starting the flight underneath a
+                    // dismissing sheet means the first third of it happens behind a panel.
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(320))
+                        flown = false
+                        flying = image
+                        withAnimation(.spring(duration: 0.72, bounce: 0.18)) { flown = true }
+                        try? await Task.sleep(for: .milliseconds(760))
+                        flying = nil
+                    }
+                }
+            )
                 .presentationDetents([.large])
                 .presentationCornerRadius(30)
                 .onDisappear { state.award(.caught) }
@@ -194,19 +235,8 @@ struct MapScreen: View {
         .sheet(isPresented: $showAlbum) {
             AlbumScreen()
         }
-        .sheet(isPresented: $showProfile) {
+        .fullScreenCover(isPresented: $showProfile) {
             ProfileScreen(state: state)
-                .presentationBackground(Ink.ground)
-                .presentationCornerRadius(Radius.surface)
-        }
-        .sheet(isPresented: $showDeck) {
-            DeckSheet(
-                onAlbum: { showDeck = false; showAlbum = true },
-                onAddFriend: { showDeck = false; showAddFriend = true }
-            )
-            .presentationDetents([.height(440)])
-            .presentationBackground(Ink.ground)
-            .presentationCornerRadius(Radius.surface)
         }
     }
 
@@ -293,21 +323,14 @@ struct MapScreen: View {
                 progress: state.levelProgress,
                 glanceTowards: glanceBearing
             ) {
-                withAnimation(Motion.arrive) { playerMenu = true }
+                // Straight to the profile. A menu in front of your own profile is a step
+                // that exists only to show the menu.
+                showProfile = true
             }
 
             Spacer()
 
             VStack(spacing: Space.tight) {
-                if let place = location.placeLabel {
-                    FloatingPill {
-                        Text(place)
-                            .font(.chinCallout)
-                            .foregroundStyle(Ink.text)
-                            .lineLimit(1)
-                    }
-                    .transition(.scale.combined(with: .opacity))
-                }
                 CatchButton(
                     enabled: state.canCatch,
                     action: { withAnimation(Motion.arrive) { catchMenu = true } },
@@ -341,7 +364,7 @@ struct MapScreen: View {
                     .transition(.scale.combined(with: .opacity))
                 }
 
-                FloatingOrb(action: { showDeck = true }) {
+                FloatingOrb(action: { withAnimation(Motion.arrive) { deckMenu = true } }) {
                     Image(systemName: "square.stack.3d.up.fill")
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(Ink.textSoft)
@@ -349,7 +372,6 @@ struct MapScreen: View {
                 .accessibilityLabel("Your friends and what you can do")
             }
         }
-        .animation(Motion.surface, value: location.placeLabel)
         .animation(Motion.surface, value: state.canCatch)
         .animation(Motion.surface, value: camera.isFollowingCourse)
     }

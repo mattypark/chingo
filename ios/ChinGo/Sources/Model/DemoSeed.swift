@@ -36,6 +36,22 @@ enum DemoSeed {
 
     static func populate(_ context: ModelContext) {
         guard isRequested else { return }
+
+        // Identity is seeded on its own. Gating it behind the friends check means a store
+        // created before MeRecord existed never gets one, and the profile shows a stranger
+        // for the rest of that install.
+        let identities = (try? context.fetch(FetchDescriptor<MeRecord>())) ?? []
+        if identities.isEmpty {
+            context.insert(
+                MeRecord(
+                    handle: "matthew",
+                    bio: "Builds things, walks everywhere, always knows a coffee place.",
+                    bannerTint: 0
+                )
+            )
+            try? context.save()
+        }
+
         // Idempotent: relaunching with the flag must not double every friend.
         let existing = (try? context.fetch(FetchDescriptor<FriendRecord>())) ?? []
         guard existing.isEmpty else { return }

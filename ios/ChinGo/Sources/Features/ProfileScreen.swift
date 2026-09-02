@@ -16,8 +16,13 @@ struct ProfileScreen: View {
     @Query(sort: \FriendRecord.metDate, order: .reverse) private var friends: [FriendRecord]
     @Query(sort: \CatchRecord.happenedAt, order: .reverse) private var catches: [CatchRecord]
     @Query private var memories: [MemoryRecord]
+    @Query private var me: [MeRecord]
 
+    @Environment(\.modelContext) private var context
     @State private var selected: FriendRecord?
+    @State private var editing = false
+
+    private var identity: MeRecord? { me.first }
 
     private var withPhotos: [CatchRecord] {
         catches.filter { $0.photoFile != nil }
@@ -36,13 +41,25 @@ struct ProfileScreen: View {
         SheetShell {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.section) {
-                    header
+                    banner
+                    identityBlock
+                    stats
                     peopleRail
                     photoRail
                     placeChips
                 }
                 .padding(.bottom, Space.step)
             }
+            // The banner runs to the very top of the screen, under the status bar, the way a
+            // profile page is supposed to. Insetting it would leave a strip of ground above
+            // the artwork and turn a header into a card.
+            .ignoresSafeArea(edges: .top)
+        }
+        .sheet(isPresented: $editing) {
+            IdentityEditor(record: identity ?? newIdentity())
+                .presentationDetents([.height(420)])
+                .presentationBackground(Ink.ground)
+                .presentationCornerRadius(Radius.surface)
         }
         .sheet(item: $selected) { friend in
             SheetShell(friend.handle) {
@@ -53,58 +70,111 @@ struct ProfileScreen: View {
         }
     }
 
-    // MARK: Header
+    // MARK: Banner and identity
 
-    private var header: some View {
-        VStack(spacing: Space.snug) {
+    /// The banner, with the bear sitting on its lower edge.
+    ///
+    /// A flat field of the mascot's own colour rather than a photograph. A photo banner on a
+    /// profile with four friends in it is an empty frame asking to be filled; a colour is
+    /// finished the moment the account exists.
+    private var banner: some View {
+        ZStack(alignment: .bottom) {
+            LinearGradient(
+                colors: [Ink.berryDeep, Ink.berry],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: 190)
+
             ZStack {
                 Circle()
-                    .fill(Ink.groundRaised)
+                    .fill(Ink.ground)
                     .elevated(.card)
                 Circle()
-                    .stroke(Ink.groundSunk, lineWidth: 5)
-                    .padding(4)
+                    .stroke(Ink.groundSunk, lineWidth: 4)
+                    .padding(3)
                 Circle()
                     .trim(from: 0, to: max(0.02, state.levelProgress))
-                    .stroke(Ink.signal, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .stroke(Ink.signal, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .padding(4)
-                // Sized to sit inside the ring whole. Filling the circle crops the ears,
-                // and the ears are most of what makes it read as a bear rather than a blob.
+                    .padding(3)
                 Image("Mascot")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 62)
+                    .frame(width: 58)
                     .offset(y: 4)
             }
-            .frame(width: 116, height: 116)
+            .frame(width: 104, height: 104)
+            // Straddling the edge is what makes it a profile rather than a card with a
+            // coloured lid.
+            .offset(y: 46)
+        }
+        .padding(.bottom, 46)
+    }
 
-            Text("Level \(state.level)")
-                .font(.chinTitle)
+    private var identityBlock: some View {
+        VStack(spacing: Space.tight) {
+            Text(identity?.handle.isEmpty == false ? identity!.handle : "you")
+                .font(.custom(Typeface.bagel, size: 26))
                 .foregroundStyle(Ink.text)
 
-            Text("\(state.xp) XP")
-                .font(.chinCallout)
-                .foregroundStyle(Ink.textSoft)
-                .contentTransition(.numericText())
+            Text("Level \(state.level) · \(state.xp) XP")
+                .chinLabelStyle()
+                .foregroundStyle(Ink.textFaint)
 
-            HStack(spacing: 0) {
-                stat("\(catches.filter { $0.kind == "snap" }.count)", "meetups")
-                Divider().frame(height: 28)
-                stat("\(friends.count)", friends.count == 1 ? "person" : "people")
-                Divider().frame(height: 28)
-                stat("\(state.streakWeeks)", state.streakWeeks == 1 ? "week" : "weeks")
+            Group {
+                if let bio = identity?.bio, !bio.isEmpty {
+                    Text(bio)
+                        .font(.chinHand)
+                        .foregroundStyle(Ink.textSoft)
+                } else {
+                    // Not a blank line. An empty bio should ask for something, in the voice
+                    // the rest of the app uses.
+                    Text("Say what you're into.")
+                        .font(.chinHand)
+                        .foregroundStyle(Ink.textFaint)
+                }
             }
-            .padding(.vertical, Space.snug)
-            .background(
-                RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
-                    .fill(Ink.groundRaised)
-                    .elevated(.low)
-            )
+            .multilineTextAlignment(.center)
+            .padding(.top, Space.hair)
+
+            Button { editing = true } label: {
+                Text(identity?.bio.isEmpty == false ? "Edit" : "Add yours")
+                    .font(.chinCallout)
+                    .foregroundStyle(Ink.signal)
+                    .padding(.horizontal, Space.step)
+                    .padding(.vertical, Space.tight)
+                    .background(Capsule().fill(Ink.signal.opacity(0.12)))
+            }
+            .buttonStyle(SquashButtonStyle())
+            .hitTarget()
+            .padding(.top, Space.hair)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, Space.margin)
-        .padding(.top, Space.inset)
+    }
+
+    private var stats: some View {
+        HStack(spacing: 0) {
+            stat("\(catches.filter { $0.kind == "snap" }.count)", "meetups")
+            Divider().frame(height: 28)
+            stat("\(friends.count)", friends.count == 1 ? "person" : "people")
+            Divider().frame(height: 28)
+            stat("\(state.streakWeeks)", state.streakWeeks == 1 ? "week" : "weeks")
+        }
+        .padding(.vertical, Space.snug)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .fill(Ink.groundRaised)
+                .elevated(.low)
+        )
+        .padding(.horizontal, Space.margin)
+    }
+
+    private func newIdentity() -> MeRecord {
+        let record = MeRecord()
+        context.insert(record)
+        return record
     }
 
     private func stat(_ value: String, _ label: String) -> some View {
@@ -211,6 +281,50 @@ struct ProfileScreen: View {
                     .padding(.vertical, Space.tight)
                 }
             }
+        }
+    }
+}
+
+/// Editing who you are. Two fields, because a profile people actually fill in is one that
+/// fits on a single screen with the keyboard up.
+struct IdentityEditor: View {
+    @Bindable var record: MeRecord
+
+    @Environment(\.modelContext) private var context
+
+    var body: some View {
+        SheetShell("You") {
+            VStack(alignment: .leading, spacing: Space.step) {
+                field("What you go by", text: $record.handle, placeholder: "matthew")
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                field(
+                    "What you're into",
+                    text: $record.bio,
+                    placeholder: "Builds things, walks everywhere, always knows a coffee place."
+                )
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Space.margin)
+        }
+        .onDisappear { try? context.save() }
+    }
+
+    private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: Space.hair) {
+            Text(label)
+                .chinLabelStyle()
+                .foregroundStyle(Ink.textFaint)
+            TextField(placeholder, text: text, axis: .vertical)
+                .font(.chinBody)
+                .foregroundStyle(Ink.text)
+                .padding(Space.snug)
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                        .fill(Ink.groundRaised)
+                )
         }
     }
 }

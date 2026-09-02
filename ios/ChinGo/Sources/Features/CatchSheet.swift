@@ -17,6 +17,8 @@ struct CatchSheet: View {
     let cell: String
     let placeLabel: String?
     let coordinate: (lat: Double, lon: Double)
+    /// Handed the saved photo so the map can fly it into the album. Nil for a TAG.
+    var onSaved: (UIImage?) -> Void = { _ in }
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -172,6 +174,7 @@ struct CatchSheet: View {
         }
 
         try? context.save()
+        onSaved(photoFile == nil ? nil : image)
         dismiss()
     }
 

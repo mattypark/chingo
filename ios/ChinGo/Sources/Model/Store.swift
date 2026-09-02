@@ -102,6 +102,30 @@ final class CatchRecord {
     }
 }
 
+/// You.
+///
+/// Its own record rather than a pile of UserDefaults keys, because this is the thing that
+/// syncs to a server first when accounts land, and because a profile is content — it belongs
+/// in the store with everything else the person has made.
+@Model
+final class MeRecord {
+    @Attribute(.unique) var id: String
+    var handle: String
+    /// One line: what you're into, what you do. Deliberately short — a profile people
+    /// actually fill in is one that fits in a sentence.
+    var bio: String
+    /// Which of the banner tints they picked, by index. Not a stored colour: colours belong
+    /// to the palette, and a hex saved in a database survives a rebrand it should not.
+    var bannerTint: Int
+
+    init(id: String = "me", handle: String = "", bio: String = "", bannerTint: Int = 0) {
+        self.id = id
+        self.handle = handle
+        self.bio = bio
+        self.bannerTint = bannerTint
+    }
+}
+
 @Model
 final class MemoryRecord {
     @Attribute(.unique) var id: String

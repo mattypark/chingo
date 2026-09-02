@@ -33,10 +33,12 @@ public enum CameraMath {
 
     /// Bearing after dragging `dx` points horizontally from `origin`.
     ///
-    /// Dragging right turns the world right, which means turning the camera left. The
-    /// opposite mapping feels like dragging a scrollbar rather than turning your head.
+    /// Drag right, turn right. The other mapping — drag right, world turns right, so the
+    /// camera turns left — is what a map-grabbing gesture does, and it is what this used to
+    /// do. It reads as backwards here because the player is pinned to the centre: you are not
+    /// pushing the ground around, you are turning on the spot.
     public static func bearing(from origin: Double, draggedBy dx: Double) -> Double {
-        normalizedBearing(origin - dx * degreesPerHorizontalPoint)
+        normalizedBearing(origin + dx * degreesPerHorizontalPoint)
     }
 
     /// Pitch after dragging `dy` points vertically from `origin`, clamped.

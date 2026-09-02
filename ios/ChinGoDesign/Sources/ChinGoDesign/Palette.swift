@@ -33,6 +33,16 @@ public enum Ink {
     public static let jade = Color(hex: 0x2FB8A0)
     public static let jadeDeep = Color(hex: 0x1E8C78)
 
+    // MARK: Berry
+    //
+    // The mascot's own colours, pulled out so a menu that takes over the screen is
+    // unmistakably his. Used for full-screen takeovers and nothing else — a berry field
+    // behind ordinary content would fight every card in the app.
+
+    public static let berry = Color(hex: 0x7A2E52)
+    public static let berryDeep = Color(hex: 0x431A31)
+    public static let berryLift = Color(hex: 0x9C3F63)
+
     // MARK: Bond tiers
     //
     // Tiers are earned, never bought, so their colours climb in weight rather than in

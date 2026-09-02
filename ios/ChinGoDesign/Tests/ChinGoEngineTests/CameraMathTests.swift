@@ -12,15 +12,15 @@ struct CameraMathTests {
         }
     }
 
-    @Test("Dragging right turns the camera left")
+    @Test("Dragging right turns right")
     func dragDirection() {
-        // Thumb moves right, the world should follow the thumb, so the camera turns the
-        // other way. Getting this backwards is the single most common feel bug in a map.
+        // The player is pinned to the centre, so a drag is turning on the spot rather than
+        // shoving the ground around: thumb right, you face further right.
         let turned = CameraMath.bearing(from: 90, draggedBy: 100)
-        #expect(turned < 90)
+        #expect(turned > 90)
 
         let back = CameraMath.bearing(from: 90, draggedBy: -100)
-        #expect(back > 90)
+        #expect(back < 90)
     }
 
     @Test("A full swipe turns you a long way, but not absurdly")
@@ -33,7 +33,7 @@ struct CameraMathTests {
     @Test("Dragging past the wrap point does not jump")
     func dragAcrossZero() {
         // Turning left from 10° should end up near 350°, not at −40°.
-        let b = CameraMath.bearing(from: 10, draggedBy: 100)
+        let b = CameraMath.bearing(from: 10, draggedBy: -100)
         #expect(b > 300 && b < 360)
     }
 

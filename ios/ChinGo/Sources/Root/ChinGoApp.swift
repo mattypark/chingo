@@ -17,7 +17,7 @@ struct ChinGoApp: App {
 
         do {
             container = try ModelContainer(
-                for: FriendRecord.self, CatchRecord.self, MemoryRecord.self
+                for: FriendRecord.self, CatchRecord.self, MemoryRecord.self, MeRecord.self
             )
         } catch {
             // Local-first means the store is the app. If it cannot open there is nothing
