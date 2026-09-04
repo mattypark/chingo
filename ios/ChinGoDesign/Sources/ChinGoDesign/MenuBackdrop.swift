@@ -44,11 +44,10 @@ public struct MenuLabel: View {
 
     public var body: some View {
         Text(text)
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
-            .textCase(.uppercase)
-            .tracking(1.1)
-            // Not full white. At full strength the labels compete with the icons they
-            // describe; held back a little they read as captions, which is what they are.
-            .foregroundStyle(Ink.onSignal.opacity(0.72))
+            // Bagel, not tracked-out caps. The caps version was borrowed from the app this
+            // one keeps getting compared to; the heavy face is ours and it is the reason the
+            // rest of the sticker language exists.
+            .font(.custom(Typeface.bagel, size: 13))
+            .foregroundStyle(Ink.onSignal.opacity(0.88))
     }
 }

@@ -46,9 +46,10 @@ public struct SheetShell<Content: View>: View {
 
 /// The circular ✕.
 ///
-/// Bordered rather than filled: it is the way out, not the thing to do. A solid button here
-/// competes with whatever the sheet is actually for, and on a sheet whose primary action is
-/// already a filled capsule, two filled controls read as a choice between equals.
+/// Wears the sticker treatment like everything else, so the way out of a screen belongs to
+/// the same object language as the things on it. It stays ground-coloured rather than signal
+/// — it is the way out, not the thing to do, and a persimmon close button on a sheet whose
+/// primary action is already persimmon reads as a choice between equals.
 public struct CloseButton: View {
     private let action: () -> Void
 
@@ -59,19 +60,11 @@ public struct CloseButton: View {
     public var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Ink.textSoft)
-                .frame(width: 46, height: 46)
-                .background {
-                    Circle()
-                        .fill(Ink.groundRaised)
-                        .elevated(.low)
-                }
-                .overlay {
-                    Circle().strokeBorder(Ink.groundSunk, lineWidth: 2)
-                }
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Ink.text)
+                .frame(width: 50, height: 50)
         }
-        .buttonStyle(SquashButtonStyle())
+        .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
         .hitTarget()
         .accessibilityLabel("Close")
     }

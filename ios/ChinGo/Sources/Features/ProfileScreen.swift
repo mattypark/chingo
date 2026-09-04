@@ -89,15 +89,13 @@ struct ProfileScreen: View {
             ZStack {
                 Circle()
                     .fill(Ink.ground)
-                    .elevated(.card)
                 Circle()
-                    .stroke(Ink.groundSunk, lineWidth: 4)
-                    .padding(3)
+                    .strokeBorder(Ink.text, lineWidth: 3)
                 Circle()
                     .trim(from: 0, to: max(0.02, state.levelProgress))
-                    .stroke(Ink.signal, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .stroke(Ink.signal, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .padding(3)
+                    .padding(6)
                 Image("Mascot")
                     .resizable()
                     .scaledToFit()
@@ -105,6 +103,8 @@ struct ProfileScreen: View {
                     .offset(y: 4)
             }
             .frame(width: 104, height: 104)
+            .compositingGroup()
+            .shadow(color: Ink.text, radius: 0, x: Sticker.drop, y: Sticker.drop)
             // Straddling the edge is what makes it a profile rather than a card with a
             // coloured lid.
             .offset(y: 46)
@@ -115,8 +115,9 @@ struct ProfileScreen: View {
     private var identityBlock: some View {
         VStack(spacing: Space.tight) {
             Text(identity?.handle.isEmpty == false ? identity!.handle : "you")
-                .font(.custom(Typeface.bagel, size: 26))
+                .font(.custom(Typeface.bagel, size: 34))
                 .foregroundStyle(Ink.text)
+                .tracking(-0.6)
 
             Text("Level \(state.level) · \(state.xp) XP")
                 .chinLabelStyle()
@@ -140,15 +141,14 @@ struct ProfileScreen: View {
 
             Button { editing = true } label: {
                 Text(identity?.bio.isEmpty == false ? "Edit" : "Add yours")
-                    .font(.chinCallout)
-                    .foregroundStyle(Ink.signal)
-                    .padding(.horizontal, Space.step)
+                    .font(.custom(Typeface.bagel, size: 15))
+                    .foregroundStyle(Ink.text)
+                    .padding(.horizontal, Space.inset)
                     .padding(.vertical, Space.tight)
-                    .background(Capsule().fill(Ink.signal.opacity(0.12)))
             }
-            .buttonStyle(SquashButtonStyle())
+            .buttonStyle(StickerButtonStyle(fill: Ink.signal, radius: Radius.surface))
             .hitTarget()
-            .padding(.top, Space.hair)
+            .padding(.top, Space.snug)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, Space.margin)
@@ -162,13 +162,12 @@ struct ProfileScreen: View {
             Divider().frame(height: 28)
             stat("\(state.streakWeeks)", state.streakWeeks == 1 ? "week" : "weeks")
         }
-        .padding(.vertical, Space.snug)
-        .background(
-            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
-                .fill(Ink.groundRaised)
-                .elevated(.low)
-        )
+        .padding(.vertical, Space.step)
+        .sticker(fill: Ink.groundRaised)
         .padding(.horizontal, Space.margin)
+        // The hard shadow sits outside the block, so the row needs room for it or it clips
+        // against whatever comes next.
+        .padding(.bottom, Sticker.drop)
     }
 
     private func newIdentity() -> MeRecord {
@@ -180,7 +179,7 @@ struct ProfileScreen: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.custom(Typeface.bagel, size: 20))
+                .font(.custom(Typeface.bagel, size: 26))
                 .foregroundStyle(Ink.text)
                 .monospacedDigit()
                 .contentTransition(.numericText())
@@ -223,7 +222,7 @@ struct ProfileScreen: View {
                     }
                     .frame(width: 118, height: 148)
                     .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-                    .elevated(.low)
+                    .sticker(fill: .clear)
 
                     Text(record.friend?.handle ?? "someone")
                         .font(.chinFootnote)
@@ -238,12 +237,11 @@ struct ProfileScreen: View {
         rail("Places", isEmpty: places.isEmpty, emptyLine: "Everywhere you meet someone.") {
             ForEach(places, id: \.self) { place in
                 Text(place)
-                    .font(.chinCallout)
+                    .font(.custom(Typeface.bagel, size: 15))
                     .foregroundStyle(Ink.text)
-                    .padding(.horizontal, Space.snug)
+                    .padding(.horizontal, Space.step)
                     .padding(.vertical, Space.tight)
-                    .background(Capsule().fill(Ink.groundRaised))
-                    .overlay(Capsule().strokeBorder(Ink.groundSunk, lineWidth: 1.5))
+                    .sticker(fill: Ink.groundRaised, radius: Radius.surface)
             }
         }
     }
@@ -261,8 +259,8 @@ struct ProfileScreen: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: Space.snug) {
             Text(heading)
-                .chinLabelStyle()
-                .foregroundStyle(Ink.textFaint)
+                .font(.custom(Typeface.bagel, size: 20))
+                .foregroundStyle(Ink.text)
                 .padding(.horizontal, Space.margin)
 
             if isEmpty {
@@ -277,8 +275,9 @@ struct ProfileScreen: View {
                     }
                     .padding(.horizontal, Space.margin)
                     // Rails clip their own shadows without this; a card whose shadow is cut
-                    // off at the scroll edge reads as a rendering bug.
-                    .padding(.vertical, Space.tight)
+                    // off at the scroll edge reads as a rendering bug. Hard shadows sit
+                    // entirely outside the block, so this needs to clear the full drop.
+                    .padding(.vertical, Space.tight + Sticker.drop)
                 }
             }
         }

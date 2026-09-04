@@ -84,30 +84,24 @@ struct RadialMenu: View {
     }
 
     private func button(_ option: RadialOption, index: Int) -> some View {
-        // 64 and 50, down from 82 and 60. On an empty field they read as plenty.
-        let size: CGFloat = option.isPrimary ? 64 : 50
+        let size: CGFloat = option.isPrimary ? 74 : 58
 
-        return Button {
-            close(then: option.action)
-        } label: {
-            VStack(spacing: Space.tight) {
-                ZStack {
-                    Circle()
-                        .fill(option.isPrimary ? Ink.ground : Ink.onSignal.opacity(0.10))
-                        .overlay(
-                            Circle().strokeBorder(Ink.onSignal.opacity(0.55), lineWidth: 1.5)
-                        )
-                    Image(systemName: option.icon)
-                        .font(.system(size: option.isPrimary ? 24 : 18, weight: .semibold))
-                        .foregroundStyle(option.isPrimary ? Ink.berry : Ink.onSignal)
-                }
-                .frame(width: size, height: size)
-
-                MenuLabel(option.label)
+        return VStack(spacing: Space.snug) {
+            Button {
+                close(then: option.action)
+            } label: {
+                Image(systemName: option.icon)
+                    .font(.system(size: option.isPrimary ? 28 : 21, weight: .bold))
+                    .foregroundStyle(option.isPrimary ? Ink.berryDeep : Ink.text)
+                    .frame(width: size, height: size)
             }
+            // Opaque, outlined, hard-shadowed. The translucent-fill-with-hairline version
+            // this replaces was the single most Pokemon-GO-looking thing in the app.
+            .buttonStyle(StickerCircleStyle(fill: option.isPrimary ? Ink.signal : Ink.ground))
+            .hitTarget()
+
+            MenuLabel(option.label)
         }
-        .buttonStyle(SquashButtonStyle())
-        .hitTarget()
         .opacity(open ? 1 : 0)
         .scaleEffect(open ? 1 : 0.5)
         .animation(Motion.arrive.delay(Double(index) * 0.04), value: open)
@@ -147,7 +141,7 @@ struct ListMenu: View {
                 // a trailing-aligned stack lands it off-centre by exactly the stack's own
                 // padding, which is the kind of misalignment that looks like carelessness
                 // rather than intent.
-                VStack(alignment: .trailing, spacing: Space.inset) {
+                VStack(alignment: .trailing, spacing: Space.snug) {
                     ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
                         row(option, index: index)
                     }
@@ -168,18 +162,27 @@ struct ListMenu: View {
             close(then: option.action)
         } label: {
             HStack(spacing: Space.snug) {
-                MenuLabel(option.label)
                 Image(systemName: option.icon)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Ink.onSignal)
-                    .frame(width: 30, height: 30)
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(Ink.text)
+                    .frame(width: 26)
+
+                Text(option.label)
+                    .font(.custom(Typeface.bagel, size: 19))
+                    .foregroundStyle(Ink.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
+            .padding(.horizontal, Space.inset)
+            .padding(.vertical, Space.snug)
         }
-        .buttonStyle(SquashButtonStyle())
+        // Bagel on a solid pill, not thin caps floating on a gradient. The label is the
+        // button now, which is what a heavy typeface wants to be.
+        .buttonStyle(StickerButtonStyle(fill: Ink.ground, radius: Radius.surface))
         .hitTarget()
         .opacity(open ? 1 : 0)
         // Rows arrive from the right, the side they belong to.
-        .offset(x: open ? 0 : 30)
+        .offset(x: open ? 0 : 40)
         .animation(Motion.arrive.delay(Double(index) * 0.05), value: open)
     }
 
