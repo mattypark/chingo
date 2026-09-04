@@ -52,11 +52,25 @@ private struct RootView: View {
     let state: MapState
     let location: LocationService
 
+    @Query private var me: [MeRecord]
     @State private var showingSplash = true
+    @State private var justOnboarded = false
+
+    /// First run is anything without a completed onboarding stamp.
+    private var needsOnboarding: Bool {
+        !justOnboarded && !(me.first?.hasOnboarded ?? false)
+    }
 
     var body: some View {
         ZStack {
             MapScreen(state: state, location: location)
+
+            if needsOnboarding {
+                OnboardingFlow(location: location) {
+                    withAnimation(Motion.surface) { justOnboarded = true }
+                }
+                .transition(.opacity)
+            }
 
             if showingSplash {
                 SplashView { showingSplash = false }

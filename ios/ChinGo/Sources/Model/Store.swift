@@ -118,12 +118,33 @@ final class MeRecord {
     /// to the palette, and a hex saved in a database survives a rebrand it should not.
     var bannerTint: Int
 
-    init(id: String = "me", handle: String = "", bio: String = "", bannerTint: Int = 0) {
+    /// The result of the age check, not the birthday that produced it.
+    ///
+    /// ChinGo never shows an age, sorts by one, or wishes anyone a happy birthday, so keeping
+    /// the date would be holding personal data with no feature behind it. The date is
+    /// evaluated once at the gate and discarded.
+    var ageTier: Int
+
+    /// When onboarding was completed. Nil means it has not been.
+    var onboardedAt: Date?
+
+    init(
+        id: String = "me",
+        handle: String = "",
+        bio: String = "",
+        bannerTint: Int = 0,
+        ageTier: Int = 0,
+        onboardedAt: Date? = nil
+    ) {
         self.id = id
         self.handle = handle
         self.bio = bio
         self.bannerTint = bannerTint
+        self.ageTier = ageTier
+        self.onboardedAt = onboardedAt
     }
+
+    var hasOnboarded: Bool { onboardedAt != nil }
 }
 
 @Model

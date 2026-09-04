@@ -49,6 +49,11 @@ final class LocationService: NSObject {
         manager.requestWhenInUseAuthorization()
     }
 
+    /// Begin updates, but only if permission already exists.
+    ///
+    /// Never triggers the prompt. Asking is `requestPermission()`, called from exactly one
+    /// place — the onboarding screen that explains why — so the alert can never appear
+    /// before its explanation.
     func start() {
         guard authorization == .authorizedWhenInUse || authorization == .authorizedAlways else { return }
         manager.startUpdatingLocation()

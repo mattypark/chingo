@@ -34,7 +34,19 @@ enum DemoSeed {
         return args[args.index(after: i)]
     }
 
+    /// `-resetOnboarding` clears the completion stamp so first run can be walked again
+    /// without deleting the app and losing everything else in the store.
+    static var resetsOnboarding: Bool {
+        ProcessInfo.processInfo.arguments.contains("-resetOnboarding")
+    }
+
     static func populate(_ context: ModelContext) {
+        if resetsOnboarding {
+            let existing = (try? context.fetch(FetchDescriptor<MeRecord>())) ?? []
+            for record in existing { record.onboardedAt = nil }
+            try? context.save()
+        }
+
         guard isRequested else { return }
 
         // Identity is seeded on its own. Gating it behind the friends check means a store
@@ -46,7 +58,11 @@ enum DemoSeed {
                 MeRecord(
                     handle: "matthew",
                     bio: "Builds things, walks everywhere, always knows a coffee place.",
-                    bannerTint: 0
+                    bannerTint: 0,
+                    ageTier: AgeTier.adult.rawValue,
+                    // Seeded as already onboarded, so -seedDemo lands on the map. Walking
+                    // first run is what -resetOnboarding is for.
+                    onboardedAt: .now
                 )
             )
             try? context.save()

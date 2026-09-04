@@ -90,6 +90,14 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - chingo
+    # Declaring a capability is also what forces an explicit App ID to exist. Without one the
+    # app signs against the team's wildcard profile, which works fine for building but means
+    # App Store Connect's bundle-ID list never shows it — there is nothing registered to show.
+    entitlements:
+      path: ChinGo/ChinGo.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.matthewpark.chingo
