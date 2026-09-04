@@ -28,26 +28,40 @@ struct RadialMenu: View {
 
     @State private var open = false
 
-    /// Where each option sits, as a fraction of the menu area. Centre first, so the primary
-    /// option lands there whatever order the caller passes.
-    private static let slots: [UnitPoint] = [
-        UnitPoint(x: 0.50, y: 0.50),   // centre — the primary
-        UnitPoint(x: 0.22, y: 0.24),   // upper left
-        UnitPoint(x: 0.78, y: 0.24),   // upper right
-        UnitPoint(x: 0.22, y: 0.76),   // lower left
-        UnitPoint(x: 0.78, y: 0.76),   // lower right
-    ]
+    /// The centre. Deliberately low: the button that opens this menu is at the bottom of the
+    /// screen, and a cluster floating in the middle makes the thumb travel up to reach what
+    /// it just pressed. Sitting the camera right above the real button means the menu opens
+    /// where the hand already is.
+    private static let centreSlot = UnitPoint(x: 0.50, y: 0.78)
 
-    /// Primary to the centre slot, everything else outward in the order given.
+    /// Where the satellites go, by how many there are.
+    ///
+    /// Not a fixed list. With a fixed grid, dropping an option leaves the survivors hanging
+    /// off one side and the whole cluster looks broken rather than smaller. One satellite
+    /// sits straight above the centre; two split evenly either side.
+    private static func satelliteSlots(count: Int) -> [UnitPoint] {
+        switch count {
+        case 0: []
+        case 1: [UnitPoint(x: 0.50, y: 0.52)]
+        case 2: [UnitPoint(x: 0.21, y: 0.56), UnitPoint(x: 0.79, y: 0.56)]
+        default: [
+            UnitPoint(x: 0.19, y: 0.58),
+            UnitPoint(x: 0.50, y: 0.48),
+            UnitPoint(x: 0.81, y: 0.58),
+        ]
+        }
+    }
+
+    /// Primary to the centre, everything else spread above it.
     private var placed: [(option: RadialOption, slot: UnitPoint)] {
-        var remaining = Self.slots
-        let centre = remaining.removeFirst()
+        let satellites = options.filter { !$0.isPrimary }
+        var remaining = Self.satelliteSlots(count: satellites.count)
         var result: [(RadialOption, UnitPoint)] = []
 
         if let primary = options.first(where: \.isPrimary) {
-            result.append((primary, centre))
+            result.append((primary, Self.centreSlot))
         }
-        for option in options where !option.isPrimary {
+        for option in satellites {
             guard !remaining.isEmpty else { break }
             result.append((option, remaining.removeFirst()))
         }
@@ -66,12 +80,17 @@ struct RadialMenu: View {
                     .padding(.top, Space.section)
 
                 GeometryReader { geo in
+                    // Drawn first so the buttons sit on top of where the lines end.
+                    Connectors(
+                        centre: point(Self.centreSlot, in: geo.size),
+                        satellites: placed.dropFirst().map { point($0.slot, in: geo.size) }
+                    )
+                    .opacity(open ? 1 : 0)
+                    .animation(Motion.arrive.delay(0.08), value: open)
+
                     ForEach(Array(placed.enumerated()), id: \.element.option.id) { index, entry in
                         button(entry.option, index: index)
-                            .position(
-                                x: geo.size.width * entry.slot.x,
-                                y: geo.size.height * entry.slot.y
-                            )
+                            .position(point(entry.slot, in: geo.size))
                     }
                 }
 
@@ -81,6 +100,10 @@ struct RadialMenu: View {
             }
         }
         .onAppear { withAnimation(Motion.arrive) { open = true } }
+    }
+
+    private func point(_ slot: UnitPoint, in size: CGSize) -> CGPoint {
+        CGPoint(x: size.width * slot.x, y: size.height * slot.y)
     }
 
     private func button(_ option: RadialOption, index: Int) -> some View {
@@ -147,11 +170,15 @@ struct ListMenu: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.trailing, Space.margin)
 
+                // Under the rows, not centred on the screen. This menu opens from the
+                // bottom-right button and the thumb that opened it is already over there;
+                // sending it back to the middle to close is a trip for nothing.
                 CloseButton { close() }
                     .opacity(open ? 1 : 0)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
+            .padding(.trailing, Space.margin)
             .padding(.bottom, Space.section)
         }
         .onAppear { withAnimation(Motion.arrive) { open = true } }
@@ -193,5 +220,75 @@ struct ListMenu: View {
             onClose()
             action?()
         }
+    }
+}
+
+
+/// The bubbly lines tying the options to the middle.
+///
+/// Thick, rounded, and bowed rather than straight, with a blob at each end — the same idea as
+/// the typeface: no thin strokes, no sharp terminals. A straight hairline between two buttons
+/// would read as a wireframe annotation; a fat curve reads as something drawn.
+///
+/// They also do real work. Without them the satellites look like three unrelated buttons
+/// scattered on a field; with them the camera is visibly the centre and the others hang off it.
+private struct Connectors: View {
+    let centre: CGPoint
+    let satellites: [CGPoint]
+
+    var body: some View {
+        ZStack {
+            ForEach(Array(satellites.enumerated()), id: \.offset) { _, target in
+                let path = curve(from: centre, to: target)
+
+                path
+                    .stroke(
+                        Ink.onSignal.opacity(0.42),
+                        style: StrokeStyle(lineWidth: 9, lineCap: .round)
+                    )
+
+                // A blob where the line meets the satellite, so the stroke ends in something
+                // round rather than simply stopping. Wider than the stroke, so it reads as a
+                // terminal rather than as the line getting thicker.
+                Circle()
+                    .fill(Ink.onSignal.opacity(0.42))
+                    .frame(width: 15, height: 15)
+                    .position(blobPoint(from: centre, to: target))
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// A single quadratic bow, always arcing upward, so the two lines mirror each other
+    /// instead of bending whichever way the geometry happens to fall.
+    private func curve(from: CGPoint, to: CGPoint) -> Path {
+        var path = Path()
+        // The centre end clears its own circle; the satellite end has to clear its circle
+        // *and* the label underneath it, or the line runs straight through the caption.
+        let start = inset(from: from, towards: to, by: 46)
+        let end = inset(from: to, towards: from, by: 66)
+        let span = abs(start.x - end.x)
+        let control = CGPoint(
+            // A straight vertical run has no horizontal span to bow from, so it gets a fixed
+            // sideways kick instead of collapsing into a plain line.
+            x: (start.x + end.x) / 2 + (span < 24 ? 26 : 0),
+            y: min(start.y, end.y) - max(span * 0.22, 18)
+        )
+        path.move(to: start)
+        path.addQuadCurve(to: end, control: control)
+        return path
+    }
+
+    /// Pulls a line end back out of the button it points at, so the stroke stops at the
+    /// button's edge rather than disappearing under it.
+    private func inset(from: CGPoint, towards: CGPoint, by distance: CGFloat) -> CGPoint {
+        let dx = towards.x - from.x
+        let dy = towards.y - from.y
+        let length = max(sqrt(dx * dx + dy * dy), 0.001)
+        return CGPoint(x: from.x + dx / length * distance, y: from.y + dy / length * distance)
+    }
+
+    private func blobPoint(from: CGPoint, to: CGPoint) -> CGPoint {
+        inset(from: to, towards: from, by: 66)
     }
 }

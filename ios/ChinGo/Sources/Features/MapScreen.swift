@@ -113,14 +113,18 @@ struct MapScreen: View {
 
             if deckMenu {
                 ListMenu(
+                    // Widest first. The pills are sized by their labels, so ordering them
+                    // long to short gives the stack one clean diagonal edge instead of a
+                    // ragged one, and puts the close button at the narrow end.
+                    //
+                    // The visibility toggle is deliberately not here. It already lives in the
+                    // top-right pill on the map, where it belongs — it is a state you are in,
+                    // not an errand you run, and having it in two places made it read as a
+                    // fourth destination.
                     options: [
+                        RadialOption(icon: "person.badge.plus", label: "Add someone") { showAddFriend = true },
                         RadialOption(icon: "person.fill", label: "Profile") { showProfile = true },
                         RadialOption(icon: "square.grid.2x2.fill", label: "Album") { showAlbum = true },
-                        RadialOption(icon: "person.badge.plus", label: "Add someone") { showAddFriend = true },
-                        RadialOption(
-                            icon: state.discoverable ? "eye.fill" : "eye.slash.fill",
-                            label: state.discoverable ? "You're out" : "You're hidden"
-                        ) { state.discoverable.toggle() },
                     ],
                     onClose: { deckMenu = false }
                 )
@@ -166,12 +170,6 @@ struct MapScreen: View {
                         RadialOption(icon: "camera.fill", label: "Take a picture", isPrimary: true) {
                             catchPulse += 1
                             showCatch = true
-                        },
-                        RadialOption(
-                            icon: state.discoverable ? "eye.fill" : "eye.slash.fill",
-                            label: state.discoverable ? "Out" : "Hidden"
-                        ) {
-                            state.discoverable.toggle()
                         },
                     ],
                     onClose: { catchMenu = false }
