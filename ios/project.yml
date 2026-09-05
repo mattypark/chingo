@@ -35,6 +35,12 @@ targets:
       path: ChinGo/Info.plist
       properties:
         CFBundleDisplayName: ChinGo
+        # Wired to the build settings on purpose. XcodeGen writes a default 1.0 / 1 into the
+        # plist otherwise, and MARKETING_VERSION then does nothing — you bump the version,
+        # upload, and App Store Connect rejects the build as a duplicate of one you thought
+        # you had superseded.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # Deliberately just a colour, with no logo on it. Apple requires the launch screen
         # to be nearly identical to the first screen, and SplashView's first frame is this
         # exact flat field -- which is what makes the handoff invisible. The mascot then

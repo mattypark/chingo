@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Privacy manifest.
+
+  Required since 1 May 2024. Missing or incomplete, this fails at UPLOAD with an ITMS error
+  rather than in review, so it blocks TestFlight entirely — you never get far enough to be
+  rejected.
+
+  Two sections matter:
+
+  NSPrivacyCollectedDataTypes is empty on purpose. Apple's definition of "collect" is data
+  transmitted off the device. Today nothing is: catches, photos, friends and memories all
+  live in the local store, and the only network traffic is map tiles being downloaded.
+  THIS MUST BE FILLED IN THE MOMENT SYNC LANDS — location, photos and user content will all
+  become collected data, and a manifest that disagrees with the nutrition label is the thing
+  Apple audits for.
+
+  NSPrivacyAccessedAPITypes covers required-reason APIs used by this app and by anything it
+  links. MapLibre caches map tiles to disk, which is why the file-timestamp and disk-space
+  categories are here rather than only the ones our own code touches.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- CA92.1: read and write only this app's own defaults. -->
+                <string>CA92.1</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- C617.1: timestamps of files inside the app's own container — catch
+                     photos, and the map tile cache. -->
+                <string>C617.1</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- E174.1: checking space before writing a file the user asked for. -->
+                <string>E174.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
