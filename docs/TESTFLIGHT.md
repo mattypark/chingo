@@ -33,7 +33,21 @@ App Store Connect → **Apps** → **+** → **New App**.
 > declaring any capability — ChinGo declares Sign in with Apple — then building once with
 > `-allowProvisioningUpdates`. Xcode registers the ID and it appears after a page refresh.
 
-### 2. Get an API key (only if you want to upload from the terminal)
+### 2a. Or just use an app-specific password (quicker)
+
+**appleid.apple.com** → Sign-In and Security → **App-Specific Passwords** → **+**. Then:
+
+```bash
+xcrun altool --store-password-in-keychain-item --item AC_PASSWORD \
+  -u you@example.com -p the-app-specific-password
+export ASC_APPLE_ID=you@example.com   # add to your shell profile
+```
+
+> **`--item` is required, and altool's own `--help` leaves it out.** Without it you get
+> `Expected item argument is missing, --item. (29)` — which reads as though you omitted the
+> name you just typed. Verified against altool 26.40.1 shipped with Xcode 26.
+
+### 2b. Get an API key (better for CI)
 
 App Store Connect → **Users and Access** → **Integrations** → **App Store Connect API** →
 **+**. Role: **App Manager**. Download the `.p8` — **you get exactly one chance**, it cannot be

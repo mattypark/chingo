@@ -13,8 +13,12 @@
 # A) App-specific password — quickest, no downloads, no API key.
 #    1. appleid.apple.com > Sign-In and Security > App-Specific Passwords > +
 #    2. Store it in your keychain (you type the password, it is never written to a file):
-#         xcrun altool --store-password-in-keychain-item AC_PASSWORD \
+#         xcrun altool --store-password-in-keychain-item --item AC_PASSWORD \
 #           -u you@example.com -p <the-app-specific-password>
+#
+#       The `--item` flag is REQUIRED and altool's own usage text omits it. Without it you
+#       get "Expected item argument is missing, --item. (29)", which reads like you left
+#       out the name you clearly just typed. Verified against altool 26.40.1.
 #    3. export ASC_APPLE_ID=you@example.com
 #
 # B) App Store Connect API key — better for CI, one-time download of a .p8.
