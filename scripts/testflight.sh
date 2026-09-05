@@ -8,15 +8,23 @@
 # has already seen, and doing it by hand is how you lose ten minutes to a duplicate-build
 # error after a five-minute archive.
 #
-# Uploading needs an App Store Connect API key. Create one at
-# App Store Connect > Users and Access > Integrations > App Store Connect API, download the
-# .p8 ONCE, then put these in your shell profile:
+# UPLOADING needs credentials, and there are two ways. Pick one, once.
 #
-#   export ASC_KEY_ID=XXXXXXXXXX
-#   export ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-#   export ASC_KEY_PATH=~/private_keys/AuthKey_XXXXXXXXXX.p8
+# A) App-specific password — quickest, no downloads, no API key.
+#    1. appleid.apple.com > Sign-In and Security > App-Specific Passwords > +
+#    2. Store it in your keychain (you type the password, it is never written to a file):
+#         xcrun altool --store-password-in-keychain-item AC_PASSWORD \
+#           -u you@example.com -p <the-app-specific-password>
+#    3. export ASC_APPLE_ID=you@example.com
 #
-# Nothing here reads, prints, or stores the key itself.
+# B) App Store Connect API key — better for CI, one-time download of a .p8.
+#    App Store Connect > Users and Access > Integrations > App Store Connect API > +
+#    (role: App Manager). The .p8 can only be downloaded ONCE.
+#      export ASC_KEY_ID=XXXXXXXXXX
+#      export ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+#
+# Nothing here ever reads, prints, or stores a credential — the keychain and the environment
+# hold them, this script only names them.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -68,17 +76,25 @@ echo "Built: $IPA"
 
 # --- upload ----------------------------------------------------------------
 if [[ "${1:-}" == "--upload" ]]; then
-  if [[ -z "${ASC_KEY_ID:-}" || -z "${ASC_ISSUER_ID:-}" ]]; then
-    echo "Set ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH first (see the top of this file)." >&2
+  if [[ -n "${ASC_APPLE_ID:-}" ]]; then
+    echo "Uploading as $ASC_APPLE_ID..."
+    xcrun altool --upload-app --type ios --file "$IPA" \
+      -u "$ASC_APPLE_ID" -p "@keychain:AC_PASSWORD"
+  elif [[ -n "${ASC_KEY_ID:-}" && -n "${ASC_ISSUER_ID:-}" ]]; then
+    echo "Uploading with API key $ASC_KEY_ID..."
+    xcrun altool --upload-app --type ios --file "$IPA" \
+      --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+  else
+    echo "No upload credentials set. See the top of this file — option A takes a minute." >&2
+    echo "Or open Transporter.app and drag in: $IPA" >&2
     exit 1
   fi
-  xcrun altool --upload-app --type ios --file "$IPA" \
-    --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
   echo
-  echo "Uploaded. It takes 5-15 minutes to finish processing before it appears in TestFlight."
+  echo "Uploaded. Processing takes 5-15 minutes; the build is genuinely not in TestFlight"
+  echo "until that finishes. You will get an email either way."
 else
   echo
-  echo "To upload, either:"
-  echo "  ./scripts/testflight.sh --upload        (needs the API key env vars)"
-  echo "  or open Transporter.app and drag in the .ipa"
+  echo "To upload:"
+  echo "  ./scripts/testflight.sh --upload"
+  echo "  or open Transporter.app and drag in the .ipa above"
 fi

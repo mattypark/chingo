@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ChinGo.ipa</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>2</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>8D9D7C605A3A94461E810B66D3DB446C78852935</string>
+				<key>dateExpires</key>
+				<string>5/20/27</string>
+				<key>type</key>
+				<string>Apple Distribution</string>
+			</dict>
+			<key>embeddedBinaries</key>
+			<array>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>6.29.0</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>8D9D7C605A3A94461E810B66D3DB446C78852935</string>
+						<key>dateExpires</key>
+						<string>5/20/27</string>
+						<key>type</key>
+						<string>Apple Distribution</string>
+					</dict>
+					<key>name</key>
+					<string>MapLibre.framework</string>
+					<key>symbols</key>
+					<true/>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>R43H5332KH</string>
+						<key>name</key>
+						<string></string>
+					</dict>
+					<key>versionNumber</key>
+					<string>6.29.0</string>
+				</dict>
+			</array>
+			<key>entitlements</key>
+			<dict>
+				<key>application-identifier</key>
+				<string>R43H5332KH.com.matthewpark.chingo</string>
+				<key>beta-reports-active</key>
+				<true/>
+				<key>com.apple.developer.applesignin</key>
+				<array>
+					<string>Default</string>
+				</array>
+				<key>com.apple.developer.team-identifier</key>
+				<string>R43H5332KH</string>
+				<key>get-task-allow</key>
+				<false/>
+			</dict>
+			<key>name</key>
+			<string>ChinGo.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>96605b5d-68c3-472d-9c4a-1b563d228feb</string>
+				<key>dateExpires</key>
+				<string>6/9/27</string>
+				<key>name</key>
+				<string>iOS Team Store Provisioning Profile: com.matthewpark.chingo</string>
+			</dict>
+			<key>symbols</key>
+			<true/>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>R43H5332KH</string>
+				<key>name</key>
+				<string></string>
+			</dict>
+			<key>versionNumber</key>
+			<string>0.1.0</string>
+		</dict>
+	</array>
+</dict>
+</plist>
