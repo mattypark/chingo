@@ -13,6 +13,8 @@ ios/*.xcodeproj/
 ios/*.xcworkspace/
 DerivedData/
 .build/
+# Archives and .ipas are 20MB+ of rebuildable output. scripts/testflight.sh remakes them.
+build/
 .swiftpm/
 *.xcuserstate
 xcuserdata/
