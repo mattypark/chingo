@@ -69,6 +69,22 @@ cd ios/ChinGoDesign && swift test     # the rules, no simulator needed
 No secrets required. Without `Secrets.xcconfig` the app runs on seeded local data, which is
 a working state rather than a broken one.
 
+## Working on this
+
+Two sessions run in parallel, each in its own lane. Prompts to paste are in
+[`nextsessions/`](nextsessions/); the rules behind them are in
+[`docs/SESSION-FRONTEND.md`](docs/SESSION-FRONTEND.md) and
+[`docs/SESSION-BACKEND.md`](docs/SESSION-BACKEND.md).
+
+- **Frontend** — screens, components, design system, mascot
+- **Backend** — rules engine, database, worker, release, App Store Connect
+
+A screen that needs a rule which does not exist asks the backend session for it rather than
+computing it in a view. Rules live in `ChinGoEngine`, which is pure and testable without a
+simulator, so they can be proved rather than eyeballed.
+
+Getting it onto other people's phones: [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md).
+
 ## Status
 
 Early. The map, the design system and the rules engine are real; the basemap is a
