@@ -60,7 +60,12 @@ struct MapLibreMap: UIViewRepresentable {
         map.logoView.isHidden = true
         // The attribution button stays. OpenStreetMap's licence requires credit, and it is
         // also the only affordance telling a curious user where the map came from.
+        //
+        // Lifted clear of HomeBar, which now spans the full width and buried it. A licence
+        // notice hidden under the chrome is not a licence notice.
         map.attributionButton.tintColor = UIColor(Ink.textFaint)
+        map.attributionButtonPosition = .bottomLeft
+        map.attributionButtonMargins = CGPoint(x: Space.inset, y: 132)
 
         map.delegate = context.coordinator
         context.coordinator.aim = { map in camera(for: map, heading: bearing) }

@@ -54,10 +54,14 @@ public struct CatchButton: View {
                     .opacity(pulse ? 0 : 1)
             }
 
+            // Sticker, like everything else it now shares a bar with. The two soft shadows
+            // this replaces -- one of them a coloured bloom -- were the last of the glassy
+            // language left on the map, and the most Pokemon-GO-looking thing in the app.
             Circle()
                 .fill(enabled ? accent.signal : Ink.groundSunk)
-                .shadow(color: enabled ? accent.signalDeep.opacity(0.35) : .clear, radius: 14, y: 6)
-                .shadow(color: Ink.shade, radius: 10, y: 4)
+                .overlay(Circle().strokeBorder(Ink.text, lineWidth: 3))
+                .compositingGroup()
+                .shadow(color: Ink.text, radius: 0, x: Sticker.drop, y: Sticker.drop)
 
             // The water. Lighter than the button so the level is legible against it, and
             // clipped to the circle so it reads as filling the button rather than sitting on

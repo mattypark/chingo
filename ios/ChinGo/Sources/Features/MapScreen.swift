@@ -318,65 +318,46 @@ struct MapScreen: View {
     }
 
     private var bottomBar: some View {
-        HStack(alignment: .bottom) {
-            // Bottom-left is you. On a map screen it is the one control whose position
-            // people learn without being told, which is why every game in this shape puts
-            // the player's own identity there.
-            MascotOrb(
-                level: state.level,
-                progress: state.levelProgress,
-                glanceTowards: glanceBearing
-            ) {
+        HomeBar(
+            level: state.level,
+            progress: state.levelProgress,
+            glanceTowards: glanceBearing,
+            canCatch: state.canCatch,
+            catchPulse: catchPulse,
+            onProfile: {
                 // Straight to the profile. A menu in front of your own profile is a step
                 // that exists only to show the menu.
                 showProfile = true
-            }
-
-            Spacer()
-
-            VStack(spacing: Space.tight) {
-                CatchButton(
-                    enabled: state.canCatch,
-                    action: { withAnimation(Motion.arrive) { catchMenu = true } },
-                    longPress: {
-                        // Straight past the menu to the camera. The haptic fires at the moment
-                        // it commits, which is how a hidden shortcut gets discovered — by
-                        // feel, without anyone having to be told it exists.
-                        catchPulse += 1
-                        showCatch = true
-                    }
-                )
-                .rewardBeat(on: catchPulse)
-                .feedback(.caught, on: catchPulse)
-            }
-
-            Spacer()
-
-            // Bottom-right is everything you can do. One entry point rather than a row of
-            // orbs, so the map keeps the screen and the actions stay one thumb away.
-            VStack(spacing: Space.tight) {
-                if !camera.isFollowingCourse {
-                    // Only appears once you have actually turned the view. A compass that is
-                    // always on screen is a compass nobody reads.
-                    FloatingOrb(diameter: 44, action: { camera.recenter(course: location.course) }) {
-                        Image(systemName: "location.north.line.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(accent.signal)
-                            .rotationEffect(.degrees(-camera.bearing))
-                    }
-                    .accessibilityLabel("Face the way you are walking")
-                    .transition(.scale.combined(with: .opacity))
+            },
+            onCatch: { withAnimation(Motion.arrive) { catchMenu = true } },
+            onCatchHold: {
+                // Straight past the menu to the camera. The haptic fires at the moment it
+                // commits, which is how a hidden shortcut gets discovered -- by feel, without
+                // anyone having to be told it exists.
+                catchPulse += 1
+                showCatch = true
+            },
+            onDeck: { withAnimation(Motion.arrive) { deckMenu = true } }
+        )
+        .overlay(alignment: .topTrailing) {
+            // The compass cannot be a fourth cell: it only exists once you have turned the
+            // view, and a cell that appears and disappears breaks the bar into two different
+            // shapes. So it floats above the end of the bar, next to the thing it undoes.
+            if !camera.isFollowingCourse {
+                Button { camera.recenter(course: location.course) } label: {
+                    Image(systemName: "location.north.line.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(accent.signal)
+                        .rotationEffect(.degrees(-camera.bearing))
+                        .frame(width: 44, height: 44)
                 }
-
-                FloatingOrb(action: { withAnimation(Motion.arrive) { deckMenu = true } }) {
-                    Image(systemName: "square.stack.3d.up.fill")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(Ink.textSoft)
-                }
-                .accessibilityLabel("Your friends and what you can do")
+                .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
+                .hitTarget()
+                .accessibilityLabel("Face the way you are walking")
+                .transition(.scale.combined(with: .opacity))
+                .offset(y: -Space.section)
             }
         }
-        .animation(Motion.surface, value: state.canCatch)
         .animation(Motion.surface, value: camera.isFollowingCourse)
     }
 }

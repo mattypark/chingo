@@ -3,6 +3,10 @@ import ChinGoDesign
 
 /// The bear, bottom-left, as the way into everything about you.
 ///
+/// Draws the face and the level ring and nothing else -- no shadow, no button, no badge.
+/// `HomeBar` owns the surface it sits on and the tap that opens the profile, because a
+/// button inside a button is two hit targets fighting over one thumb.
+///
 /// This is where the cuteness research stops being a mood board and becomes timings.
 ///
 /// **It reacts before it acts.** The press response is a `ButtonStyle`, so it lands on the
@@ -29,7 +33,8 @@ struct MascotOrb: View {
     var progress: Double
     /// Screen-relative direction of the nearest thing worth noticing, in degrees, or nil.
     var glanceTowards: Double?
-    var action: () -> Void
+    /// Outside diameter. The ring is drawn inside it.
+    var diameter: CGFloat = 46
 
     @State private var idle: Idle = .breathe
     @State private var beat = false
@@ -79,53 +84,34 @@ struct MascotOrb: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            ZStack {
-                Circle()
-                    .fill(Ink.groundRaised)
-                    .elevated(.float)
+        ZStack {
+            Circle()
+                .fill(Ink.groundSunk)
 
-                Circle()
-                    .stroke(Ink.groundSunk, lineWidth: 3)
-                    .padding(2)
+            Circle()
+                .trim(from: 0, to: max(0.02, progress))
+                .stroke(accent.signal, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .padding(1.5)
 
-                Circle()
-                    .trim(from: 0, to: max(0.02, progress))
-                    .stroke(accent.signal, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .padding(2)
-
-                Image("Mascot")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 40)
-                    .offset(y: 4 + (beat ? idle.offset : 0))
-                    .scaleEffect(beat ? idle.scale : 1, anchor: .bottom)
-                    .rotationEffect(.degrees(beat ? idle.rotation : 0), anchor: .bottom)
-                    // Leaning toward whatever is nearby. Capped hard: past a few degrees an
-                    // orb this small stops reading as "looking over there" and starts reading
-                    // as broken layout.
-                    .rotationEffect(.degrees(glanceTilt), anchor: .bottom)
-                    .clipShape(Circle())
-
-                Text("\(level)")
-                    .font(.custom(Typeface.bagel, size: 11))
-                    .foregroundStyle(accent.onSignal)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(accent.signal))
-                    .overlay(Capsule().stroke(Ink.groundRaised, lineWidth: 2))
-                    .offset(y: 26)
-            }
-            // Tall enough to contain the badge hanging below the circle, which the stack
-            // would otherwise clip and the screen edge would cut in half.
-            .frame(width: 58, height: 76, alignment: .top)
+            Image("Mascot")
+                .resizable()
+                .scaledToFit()
+                .frame(width: diameter * 0.78)
+                .offset(y: diameter * 0.09 + (beat ? idle.offset : 0))
+                .scaleEffect(beat ? idle.scale : 1, anchor: .bottom)
+                .rotationEffect(.degrees(beat ? idle.rotation : 0), anchor: .bottom)
+                // Leaning toward whatever is nearby. Capped hard: past a few degrees an
+                // orb this small stops reading as "looking over there" and starts reading
+                // as broken layout.
+                .rotationEffect(.degrees(glanceTilt), anchor: .bottom)
+                .clipShape(Circle())
+                .padding(3)
         }
-        .buttonStyle(SquashButtonStyle())
-        .hitTarget()
+        .frame(width: diameter, height: diameter)
         .animation(Motion.surface, value: glanceTilt)
         .task { await liveIdly() }
-        .accessibilityLabel("You, level \(level)")
+        .accessibilityHidden(true)   // HomeBar labels the whole cell
     }
 
     private var glanceTilt: Double {

@@ -19,7 +19,6 @@ struct PlayerPuck: View {
             ZStack {
                 Circle()
                     .fill(Ink.groundRaised)
-                    .shadow(color: Ink.shade, radius: 14, y: 7)
 
                 // Track first, then the earned arc on top of it, so the ring reads as a
                 // gauge rather than as a decorative stroke.
@@ -38,6 +37,9 @@ struct PlayerPuck: View {
                     .foregroundStyle(Ink.textSoft)
             }
             .frame(width: 68, height: 68)
+            .overlay(Circle().strokeBorder(Ink.text, lineWidth: 3))
+            .compositingGroup()
+            .shadow(color: Ink.text, radius: 0, x: Sticker.drop, y: Sticker.drop)
 
             // Sits below the ring, not across it: a badge that clips the gauge makes the
             // gauge unreadable at exactly the moment it matters.
@@ -49,18 +51,12 @@ struct PlayerPuck: View {
                 .background(Capsule().fill(accent.signal))
                 .overlay(Capsule().stroke(Ink.groundRaised, lineWidth: 2))
                 .offset(y: -9)
-                .shadow(color: Ink.shade, radius: 4, y: 2)
         }
-        .background(alignment: .bottom) {
-            // Contact shadow on the ground plane. Elliptical because the ground is raked
-            // back — a round shadow under a tilted map reads as a sticker.
-            Ellipse()
-                .fill(Ink.text.opacity(0.10))
-                .frame(width: 74, height: 20)
-                .blur(radius: 5)
-                .scaleEffect(breathing ? 1.06 : 0.94)
-                .offset(y: 4)
-        }
+        // The blurred contact ellipse that used to sit under this is gone. Its own comment
+        // said a round shadow under a raked map "reads as a sticker" -- true, and now that
+        // the whole screen is stickers, that is the thing to be rather than the thing to
+        // avoid. The hard drop does the job, and it does it without blur.
+        .scaleEffect(breathing ? 1.02 : 1, anchor: .bottom)
         .onAppear {
             guard !Motion.reduceMotion else { return }
             withAnimation(Motion.breathe) { breathing = true }

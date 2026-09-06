@@ -35,17 +35,24 @@ struct MemoryBubble: View {
                     .offset(y: -4)
                 }
                 .frame(width: 48, height: 54)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Ink.text, lineWidth: 3)
+                }
                 .rotationEffect(.degrees(-4))
-                .shadow(color: Ink.shade, radius: 8, y: 4)
+                .compositingGroup()
+                .shadow(color: Ink.text, radius: 0, x: Sticker.drop, y: Sticker.drop)
 
                 // The stem is what fixes the polaroid to a spot on the ground rather than
-                // leaving it floating over the map.
+                // leaving it floating over the map. 3pt and solid ink: the 1.5pt translucent
+                // version was a hairline next to a 3pt outline, which is the exact pairing
+                // the sticker language exists to stop.
                 Rectangle()
-                    .fill(Ink.text.opacity(0.18))
-                    .frame(width: 1.5, height: 14)
+                    .fill(Ink.text)
+                    .frame(width: 3, height: 14)
                 Circle()
-                    .fill(Ink.text.opacity(0.18))
-                    .frame(width: 5, height: 5)
+                    .fill(Ink.text)
+                    .frame(width: 7, height: 7)
             }
             .offset(y: bob ? -3 : 0)
         }
