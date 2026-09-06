@@ -54,7 +54,9 @@ struct OnboardingStep<Content: View>: View {
             Button(action: onPrimary) {
                 Text(primary)
                     .font(.custom(Typeface.bagel, size: 19))
-                    .foregroundStyle(Ink.text)
+                    // Follows the accent, because half the set is dark enough that ink on it
+                    // fails AA. This is also the live preview on the colour step.
+                    .foregroundStyle(accent.onSignal)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Space.step)
             }

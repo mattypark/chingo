@@ -20,12 +20,29 @@ struct OnboardingFlow: View {
     @Environment(\.modelContext) private var context
     @Query private var me: [MeRecord]
 
-    @State private var step: Step = .welcome
+    @State private var step: Step = OnboardingFlow.opening
     @State private var birthdate = Calendar.current.date(byAdding: .year, value: -20, to: .now) ?? .now
     @State private var blocked = false
 
     private enum Step: Int, CaseIterable {
-        case welcome, age, location, terms, safety
+        case welcome, age, look, location, terms, safety
+    }
+
+    /// Where `-onboardStep` says to start. Release builds carry no flags, so this is always
+    /// `.welcome` outside a debug run.
+    private static var opening: Step {
+        #if DEBUG
+        switch DemoSeed.onboardStep {
+        case "age": return .age
+        case "look": return .look
+        case "location": return .location
+        case "terms": return .terms
+        case "safety": return .safety
+        default: return .welcome
+        }
+        #else
+        return .welcome
+        #endif
     }
 
     var body: some View {
@@ -36,6 +53,7 @@ struct OnboardingFlow: View {
                 switch step {
                 case .welcome: welcome
                 case .age: age
+                case .look: look
                 case .location: locationStep
                 case .terms: terms
                 case .safety: safety
@@ -76,7 +94,7 @@ struct OnboardingFlow: View {
             try? context.save()
 
             if tier == .adult {
-                advance(to: .location)
+                advance(to: .look)
             } else {
                 withAnimation(Motion.surface) { blocked = true }
             }
@@ -100,6 +118,27 @@ struct OnboardingFlow: View {
                     .multilineTextAlignment(.center)
                     .padding(.top, Space.step)
             }
+        }
+    }
+
+    /// The one screen that gives something rather than asking for something.
+    ///
+    /// Sits after the age gate and before the permission on purpose: there is no point
+    /// letting somebody decorate an app that is about to turn them away, and by the time the
+    /// app asks for location it should already be theirs.
+    private var look: some View {
+        OnboardingStep(
+            art: .bearCorner,
+            title: "Pick your colour",
+            message: "This is the button you'll press most, so it may as well be yours. Change it any time from your profile.",
+            primary: "That's the one"
+        ) {
+            advance(to: .location)
+        } content: {
+            // Writes straight through to the record, which is what makes the button below
+            // repaint as you tap. The preview of the choice is the screen you are choosing
+            // on -- a swatch next to a mock-up of a button would be a worse version of it.
+            AccentPicker(selection: accentChoice)
         }
     }
 
@@ -150,6 +189,19 @@ struct OnboardingFlow: View {
 
     private func advance(to next: Step) {
         withAnimation(Motion.surface) { step = next }
+    }
+
+    /// Reads and writes the accent index on the record itself rather than parking it in
+    /// `@State` until the step ends. The `@Query` above republishes on the write, `RootView`
+    /// re-resolves the accent, and the whole flow recolours on the same frame.
+    private var accentChoice: Binding<Int> {
+        Binding(
+            get: { me.first?.bannerTint ?? Accent.fallback.id },
+            set: { chosen in
+                identity().bannerTint = chosen
+                try? context.save()
+            }
+        )
     }
 
     private func identity() -> MeRecord {

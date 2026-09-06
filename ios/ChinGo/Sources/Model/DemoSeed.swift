@@ -40,6 +40,31 @@ enum DemoSeed {
         ProcessInfo.processInfo.arguments.contains("-resetOnboarding")
     }
 
+    /// `-onboardStep look` opens first run already on that screen.
+    ///
+    /// Sibling of `-open`, and there for the same reason: a screen four taps into a flow is a
+    /// screen that stops getting looked at.
+    /// `-accent 4` forces the seeded identity onto that accent.
+    ///
+    /// Eight accents times every screen is not something anyone will tap through by hand, so
+    /// the screenshot pass gets a flag. Applied on every `-seedDemo` launch, not only the
+    /// first, so the same install can be shot in each colour.
+    static var accentOverride: Int? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-accent"), args.index(after: i) < args.endIndex else {
+            return nil
+        }
+        return Int(args[args.index(after: i)])
+    }
+
+    static var onboardStep: String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-onboardStep"), args.index(after: i) < args.endIndex else {
+            return nil
+        }
+        return args[args.index(after: i)]
+    }
+
     static func populate(_ context: ModelContext) {
         if resetsOnboarding {
             let existing = (try? context.fetch(FetchDescriptor<MeRecord>())) ?? []
@@ -65,6 +90,15 @@ enum DemoSeed {
                     onboardedAt: .now
                 )
             )
+            try? context.save()
+        }
+
+        // After the identity exists, so a fresh install honours the flag on its first launch
+        // rather than only on the second.
+        if let forced = accentOverride {
+            for record in (try? context.fetch(FetchDescriptor<MeRecord>())) ?? [] {
+                record.bannerTint = forced
+            }
             try? context.save()
         }
 

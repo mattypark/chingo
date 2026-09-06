@@ -117,7 +117,7 @@ struct RadialMenu: View {
             } label: {
                 Image(systemName: option.icon)
                     .font(.system(size: option.isPrimary ? 28 : 21, weight: .bold))
-                    .foregroundStyle(option.isPrimary ? Ink.berryDeep : Ink.text)
+                    .foregroundStyle(option.isPrimary ? accent.onSignal : Ink.text)
                     .frame(width: size, height: size)
             }
             // Opaque, outlined, hard-shadowed. The translucent-fill-with-hairline version

@@ -59,7 +59,7 @@ struct ProfileScreen: View {
         }
         .sheet(isPresented: $editing) {
             IdentityEditor(record: identity ?? newIdentity())
-                .presentationDetents([.height(420)])
+                .presentationDetents([.height(560)])
                 .presentationBackground(Ink.ground)
                 .presentationCornerRadius(Radius.surface)
         }
@@ -144,7 +144,9 @@ struct ProfileScreen: View {
             Button { editing = true } label: {
                 Text(identity?.bio.isEmpty == false ? "Edit" : "Add yours")
                     .font(.custom(Typeface.bagel, size: 15))
-                    .foregroundStyle(Ink.text)
+                    // The accent decides its own label colour. Ink here would be unreadable
+                    // on the darker half of the set -- pine puts it at 3.3:1.
+                    .foregroundStyle(accent.onSignal)
                     .padding(.horizontal, Space.inset)
                     .padding(.vertical, Space.tight)
             }
@@ -286,8 +288,12 @@ struct ProfileScreen: View {
     }
 }
 
-/// Editing who you are. Two fields, because a profile people actually fill in is one that
-/// fits on a single screen with the keyboard up.
+/// Editing who you are. Two fields and a colour, because a profile people actually fill in
+/// is one that fits on a single screen with the keyboard up.
+///
+/// The accent lives here rather than behind a Settings screen the app does not have. It was
+/// chosen during onboarding as part of saying who you are, so this is where somebody comes
+/// looking to change it.
 struct IdentityEditor: View {
     @Bindable var record: MeRecord
 
@@ -306,11 +312,24 @@ struct IdentityEditor: View {
                     placeholder: "Builds things, walks everywhere, always knows a coffee place."
                 )
 
+                VStack(alignment: .leading, spacing: Space.snug) {
+                    Text("Your colour")
+                        .chinLabelStyle()
+                        .foregroundStyle(Ink.textFaint)
+                    AccentPicker(selection: $record.bannerTint)
+                }
+                .padding(.top, Space.tight)
+
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, Space.margin)
         }
+        // Saved on the way out for the text fields, which change on every keystroke. The
+        // accent is deliberately not waiting for that -- see below.
         .onDisappear { try? context.save() }
+        // A colour change has to survive the sheet being dismissed by a swipe, and it has to
+        // reach the map behind it immediately, so it commits on the tap rather than on exit.
+        .onChange(of: record.bannerTint) { _, _ in try? context.save() }
     }
 
     private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
