@@ -57,6 +57,19 @@ enum DemoSeed {
         return Int(args[args.index(after: i)])
     }
 
+    /// `-skyAltitude -5` pins the sun there instead of computing it.
+    ///
+    /// The whole twilight ramp happens in about twenty minutes a day. Without a way to force
+    /// it, the interesting nine tenths of the sky palette is not something anyone will look
+    /// at on purpose.
+    static var skyAltitude: Double? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-skyAltitude"), args.index(after: i) < args.endIndex else {
+            return nil
+        }
+        return Double(args[args.index(after: i)])
+    }
+
     static var onboardStep: String? {
         let args = ProcessInfo.processInfo.arguments
         guard let i = args.firstIndex(of: "-onboardStep"), args.index(after: i) < args.endIndex else {
