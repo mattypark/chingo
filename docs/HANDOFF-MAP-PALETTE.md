@@ -1,0 +1,75 @@
+# The basemap palette has drifted from `Ink`
+
+For the backend session. Frontend has worked around this; the root cause is in a file
+frontend does not own.
+
+## What is wrong
+
+`scripts/build-style.py` keeps its own copy of the palette in an `INK` dict, with a comment
+saying the two files change together. They have not.
+
+### The ground is the wrong colour
+
+`build-style.py:27` defines a key that exists nowhere in `Palette.swift`:
+
+```python
+"land_alt": "#E9E2CF",
+```
+
+and lines 74–78 apply it through a branch whose two arms are identical:
+
+```python
+elif "landuse" in tag or "landcover" in tag:
+    flat("fill-color", INK["land_alt"])
+else:
+    flat("fill-color", INK["land_alt"])
+```
+
+Because the `else` is a catch-all, `land_alt` reaches **ten** layers — `landuse-residential`,
+`-suburb`, `-commercial`, `-industrial`, `-hospital`, `-school`, `-railway`, `aeroway-area`,
+`road_area_pier`, `highway-area` — while the real `Ink.mapLand` `#EDE7D6` reaches exactly
+**one**, the `background` layer underneath them all.
+
+So at city zoom the ground you see is an invented colour that is darker than the palette
+specifies, and darker again than the `Ink.ground` chrome sitting on top of it. This is the
+"map's ground renders darker than the palette specifies" note in `nextsessions/FRONTEND-PROMPT.md`.
+
+### Three building colours have drifted
+
+| `INK` key | in `build-style.py` | `Ink` token | in `Palette.swift` |
+|---|---|---|---|
+| `building` | `#F2EBDA` | `mapBuilding` | `#E4DCC8` |
+| `building_warm` | `#EADEC8` | `mapBuildingWarm` | `#DCCFB4` |
+| `building_side` | `#DCCDB2` | `mapBuildingSide` | `#C6B99C` |
+
+### Two upstream colours were never repainted
+
+`#f2eae2` and `#dfdbd7` survive from OpenFreeMap's `bright` style on the `building` and
+`building-top` layers. Lowercase, which is the tell — everything repainted is uppercase.
+
+### One dead key
+
+`road_minor` (`#F7F2E4`) is defined and never read.
+
+## What frontend did about it
+
+`ios/ChinGo/Sources/Components/MapStyle.swift` rewrites the style JSON on the way into
+MapLibre: it maps each drifted colour back to its `Ink` token, then washes the neutral family
+toward the player's chosen accent. Water and parks are deliberately untouched.
+
+That was not a preference. A per-player accent cannot be baked into a static build artefact,
+so the tint had to happen at runtime anyway, and correcting the palette in the same pass cost
+nothing. It also stays inside the ownership line: `scripts/` is yours, and the generated
+`chingo-style.json` carries a do-not-edit banner because the next regeneration would discard
+any hand edit.
+
+## What would actually fix it
+
+Stop mirroring the palette by hand. `Palette.swift` is a flat list of `Color(hex: 0x……)`
+constants and is trivially parseable; have `build-style.py` read it and build `INK` from what
+it finds, failing loudly on a token it cannot resolve. Then fix the catch-all branch so that
+non-landuse fills fall through to `land` rather than to a second ground colour.
+
+Once the generated style is correct at the source, `MapStyle` should keep only the accent
+wash and drop the `corrections` table. It is written so that deleting entries from that one
+dictionary is the whole change.

@@ -109,6 +109,30 @@ public struct Accent: Identifiable, Sendable, Equatable, Hashable {
 
     /// What a brand-new store gets before anyone has chosen.
     public static let fallback = all[0]
+
+    /// How much of the accent reaches the basemap. Enough to tell two players' maps apart at
+    /// a glance, far short of enough to make the map itself the loud thing.
+    public static let washStrength: Double = 0.10
+
+    /// `base`, nudged toward this accent's wash.
+    ///
+    /// Lives here rather than next to the map code so it can be tested: a blend that
+    /// silently drifts toward grey, or toward the accent, is not something a screenshot
+    /// catches -- the map would just look slightly wrong forever.
+    public func washing(_ base: Color) -> Color {
+        let ground = base.resolve(in: EnvironmentValues())
+        let tint = mapWash.resolve(in: EnvironmentValues())
+        func mix(_ a: Float, _ b: Float) -> Double {
+            Double(a) + (Double(b) - Double(a)) * Self.washStrength
+        }
+        return Color(
+            .sRGB,
+            red: mix(ground.red, tint.red),
+            green: mix(ground.green, tint.green),
+            blue: mix(ground.blue, tint.blue),
+            opacity: 1
+        )
+    }
 }
 
 // MARK: - Environment

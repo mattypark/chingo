@@ -20,6 +20,7 @@ import ChinGoDesign
 /// one that leaks. So the camera is driven from our coordinate, and MapLibre never starts a
 /// `CLLocationManager` of its own.
 struct MapLibreMap: UIViewRepresentable {
+    @Environment(\.accent) private var accent
 
     /// Where to point the camera.
     var coordinate: CLLocationCoordinate2D
@@ -34,8 +35,10 @@ struct MapLibreMap: UIViewRepresentable {
     var zoom: Double
 
     func makeUIView(context: Context) -> MLNMapView {
-        let style = Bundle.main.url(forResource: "chingo-style", withExtension: "json")
-        let map = MLNMapView(frame: .zero, styleURL: style)
+        // Not the bundled file directly: MapStyle corrects the palette the generated style
+        // drifted from and washes the neutral family toward the player's accent.
+        let map = MLNMapView(frame: .zero, styleURL: MapStyle.url(for: accent))
+        context.coordinator.paintedAccent = accent.id
 
         map.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         // Our own puck is drawn on top, centred and fixed. MapLibre's blue dot would be a
@@ -96,6 +99,10 @@ struct MapLibreMap: UIViewRepresentable {
         /// The camera most recently asked for, replayed once the style is ready.
         var aim: ((MLNMapView) -> MLNMapCamera)?
 
+        /// Which accent the loaded style was painted for. A style reload is expensive and
+        /// clobbers the camera, so it happens only when the colour genuinely changed.
+        var paintedAccent: Int?
+
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
             guard let aim else { return }
             mapView.setCamera(aim(mapView), animated: false)
@@ -106,6 +113,13 @@ struct MapLibreMap: UIViewRepresentable {
         let lastZoom = context.coordinator.lastZoom
         context.coordinator.lastZoom = zoom
         context.coordinator.aim = { map in camera(for: map, heading: bearing) }
+
+        if context.coordinator.paintedAccent != accent.id {
+            context.coordinator.paintedAccent = accent.id
+            // Reloading throws the camera back to the style's default; didFinishLoading puts
+            // it where the player is again.
+            map.styleURL = MapStyle.url(for: accent)
+        }
         // A drag must land on the same frame it happens on, or looking around feels like
         // steering a boat. Position changes still ease, because a camera that snaps to every
         // GPS fix reads as jitter even when the fixes are good.

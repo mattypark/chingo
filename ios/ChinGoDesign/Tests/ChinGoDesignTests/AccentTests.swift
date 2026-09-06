@@ -95,6 +95,49 @@ struct AccentTests {
         }
     }
 
+    /// The wash goes under the whole city, computed rather than hand-picked, so it is worth
+    /// pinning what "10 percent toward the accent" actually means. A blend that drifts toward
+    /// grey, or toward the accent, is not something a screenshot catches -- the map would just
+    /// look slightly wrong forever.
+    @Test("Washing moves a tenth of the way and no further")
+    func washingIsATenth() {
+        for accent in Accent.all {
+            let base = Ink.mapLand
+            let washed = accent.washing(base)
+
+            // Still overwhelmingly the ground it started as.
+            #expect(contrast(washed, base) < 1.15, "\(accent.name): the wash moved the ground too far")
+
+            // And measurably not the ground it started as, or the setting does nothing.
+            #expect(!sameColour(washed, base), "\(accent.name): the wash did not move the ground at all")
+
+            // Each channel exactly a tenth of the way to the wash colour.
+            let b = base.resolve(in: EnvironmentValues())
+            let t = accent.mapWash.resolve(in: EnvironmentValues())
+            let w = washed.resolve(in: EnvironmentValues())
+            for (from, to, got) in [(b.red, t.red, w.red), (b.green, t.green, w.green), (b.blue, t.blue, w.blue)] {
+                let expected = from + (to - from) * Float(Accent.washStrength)
+                #expect(abs(got - expected) < 0.002, "\(accent.name): channel landed at \(got), expected \(expected)")
+            }
+        }
+    }
+
+    /// Two players on the same street must not be looking at the same map.
+    @Test("Every accent washes the ground to a different colour")
+    func washesAreDistinct() {
+        let grounds = Accent.all.map { $0.washing(Ink.mapLand).resolve(in: EnvironmentValues()) }
+        for (i, a) in grounds.enumerated() {
+            for b in grounds[(i + 1)...] {
+                #expect(abs(a.red - b.red) + abs(a.green - b.green) + abs(a.blue - b.blue) > 0.004)
+            }
+        }
+    }
+
+    private func sameColour(_ a: Color, _ b: Color) -> Bool {
+        let (x, y) = (a.resolve(in: EnvironmentValues()), b.resolve(in: EnvironmentValues()))
+        return abs(x.red - y.red) < 0.001 && abs(x.green - y.green) < 0.001 && abs(x.blue - y.blue) < 0.001
+    }
+
     /// Anyone who never opens the picker must not see their app change.
     @Test("Index 0 is still the coral the app shipped with")
     func firstAccentIsUnchanged() {

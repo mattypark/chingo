@@ -185,7 +185,7 @@ struct MapScreen: View {
                 )
             }
         }
-        .background(Ink.mapLand)
+        .background(MapStyle.ground(for: accent))
         .task {
             // Deliberately does NOT request permission. The map is built underneath
             // onboarding from the first frame, so asking here fires the system alert before
