@@ -65,6 +65,32 @@ Skip this if you would rather drag the file into Transporter.
 
 ---
 
+## Optional but worth it: drive App Store Connect from here
+
+`asc-mcp` exposes App Store Connect as MCP tools, so builds, testers, feedback and reviews can
+be handled in conversation instead of by clicking. Already installed at `~/.mint/bin/asc-mcp`.
+
+```bash
+./scripts/asc-setup.sh ~/Downloads/AuthKey_XXXXXXXXXX.p8 <KEY_ID> <ISSUER_ID>
+```
+
+That moves the key to `~/.keys` at 0600, links it where `altool` searches — it will not accept
+a path, only a fixed set of directories, which is why the **same key covers uploading and the
+MCP** — writes the config, and registers the server. Restart Claude Code afterwards.
+
+**It is deliberately scoped.** The server ships 502 tools across 33 domains; ten workers are
+enabled:
+
+`apps` · `builds` · `build_uploads` · `beta_app` · `beta_groups` · `beta_testers` ·
+`beta_feedback` · `pre_release` · `export_compliance` · `reviews`
+
+Pricing, subscriptions, in-app purchases, users and provisioning are not exposed at all. The
+key's role still permits them at Apple's end — the point is that the tools to reach them do
+not exist in the session, so an accident cannot. Verified: an unknown worker name is rejected
+and the server falls back to the core three rather than silently enabling everything.
+
+---
+
 ## Every build
 
 ```bash

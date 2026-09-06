@@ -82,6 +82,7 @@ echo "Registering the MCP server, scoped to TestFlight..."
 #
 #   apps              find the app
 #   builds            processing state, and the beta sub-workers it pulls in
+#   build_uploads     deliver a build straight from here, no Transporter
 #   beta_app          "what to test", beta descriptions
 #   beta_groups       internal and external tester groups
 #   beta_testers      adding and removing people
@@ -89,7 +90,7 @@ echo "Registering the MCP server, scoped to TestFlight..."
 #   pre_release       pre-release versions
 #   export_compliance marking a build compliant so it becomes testable
 #   reviews           customer reviews, once it is public
-WORKERS="apps,builds,beta_app,beta_groups,beta_testers,beta_feedback,pre_release,export_compliance,reviews"
+WORKERS="apps,builds,build_uploads,beta_app,beta_groups,beta_testers,beta_feedback,pre_release,export_compliance,reviews"
 
 claude mcp remove asc-mcp --scope user >/dev/null 2>&1 || true
 claude mcp add --transport stdio --scope user asc-mcp \
