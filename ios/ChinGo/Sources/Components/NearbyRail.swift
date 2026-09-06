@@ -28,9 +28,6 @@ struct NearbyRail: View {
     /// One row's worth of drag. Short enough that a flick moves several, long enough that a
     /// thumb resting on the screen does not.
     private static let rowTravel: CGFloat = 34
-    /// Every row is the same height whatever size its name is set at, so the focus line can
-    /// be a fixed position rather than something recomputed from eight different fonts.
-    private static let rowHeight: CGFloat = 38
     /// Presence is inherently a short list -- people within a couple of hundred metres who
     /// have switched themselves visible. Capped anyway, because an unbounded stack of names
     /// would slide off both ends of the screen.
@@ -50,6 +47,13 @@ struct NearbyRail: View {
         // The screen margin comes from the stack this sits in, alongside the two bars, so
         // the rail lines up with them rather than inventing its own edge.
         .frame(maxWidth: .infinity, alignment: .trailing)
+        // Capped, and this is the one place in the app that caps anything. The rail is an
+        // overlay on a live map with a fixed slot between two bars; past accessibility1 the
+        // names start colliding with each other and the caption spans the whole screen,
+        // covering the map it is annotating. Clamping keeps it legible and keeps the map
+        // visible, and nothing here is only available visually -- every name is a labelled
+        // button and the caption is read out with it.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .feedback(.pick, on: picks)
     }
 
@@ -61,7 +65,7 @@ struct NearbyRail: View {
     /// scrubbed one name. Same structure, opposite mechanic, because the data is not the same
     /// shape. What carries the choice is the size ramp and the rule, not the position.
     private var rail: some View {
-        VStack(alignment: .trailing, spacing: 0) {
+        VStack(alignment: .trailing, spacing: Space.hair) {
             ForEach(Array(listed.enumerated()), id: \.element.id) { index, person in
                 let distance = abs(index - clampedFocus)
 
@@ -84,7 +88,6 @@ struct NearbyRail: View {
                             .offset(y: 3)
                             .opacity(distance == 0 ? 1 : 0)
                     }
-                    .frame(height: Self.rowHeight, alignment: .center)
                     .contentShape(Rectangle())
                     .onTapGesture { move(to: index) }
                     .accessibilityAddTraits(distance == 0 ? [.isButton, .isSelected] : .isButton)
@@ -135,7 +138,14 @@ struct NearbyRail: View {
         Text("Nobody out here yet.")
             .font(.chinHand)
             .foregroundStyle(Ink.textSoft)
+            // Same hard cream offset the names get. Gloria is a lighter face than Bagel and
+            // needs it more, not less, over a park.
+            .shadow(color: Ink.ground, radius: 0, x: 2, y: 2)
             .multilineTextAlignment(.trailing)
+            // Narrow enough to wrap onto two short lines and stay hard against the right
+            // edge. On one line it reaches back across the middle of the screen and lands on
+            // top of the player puck, which sits dead centre and never moves.
+            .frame(maxWidth: 132, alignment: .trailing)
     }
 
     private var clampedFocus: Int {

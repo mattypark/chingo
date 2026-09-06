@@ -32,12 +32,36 @@ Each of these is a named tell. None of them ship.
 | Concern | File | Rule |
 |---|---|---|
 | Colour | `Palette.swift` → `Ink` | Never a literal. The map's colours live here too, so the basemap and the chrome above it stay one product. |
+| The accent | `Accent.swift` → `@Environment(\.accent)` | The one colour the app does not choose. Eight measured hues, picked in onboarding, stored as an index on `MeRecord.bannerTint`. Read from the environment, never from `Ink` — a `static let` cannot change and cannot tell SwiftUI that it did. |
+| Sky | `Sky.swift` | Solar altitude from a coordinate, offline. A palette keyed on the angle, never on the clock. |
 | Type | `Typography.swift` | Bagel Fat One for numbers and two-word shouts, never a sentence. SF Pro for anything read. Gloria only when a person is speaking. |
 | Spacing | `Tokens.swift` → `Space` | 8pt grid, 4pt subdivisions. `hair` 4 · `tight` 8 · `snug` 12 · `step` 16 · `inset` 20 · `margin` 24 · `section` 32 |
 | Radius | `Tokens.swift` → `Radius` | Three tiers: `control` 12 · `card` 20 · `surface` 28 |
-| Elevation | `Tokens.swift` → `Elevation` | Four recipes: `low` · `float` · `card` · `sheet`. Applied with `.elevated(_:)` |
+| Elevation | `Sticker.swift` → `Sticker.drop` | Hard, zero blur, one offset. `Tokens.swift` → `Elevation` still holds the four soft recipes, but nothing on the map screen uses them any more — see below. |
 | Motion | `Motion.swift` | Interface springs, three reward beats, two ambient loops |
 | Haptics | `Haptics.swift` → `Feedback` | Five events, closed set |
+
+### What building it overruled
+
+Two rules in the original contract lost to looking at the running app. Both are recorded here
+rather than quietly edited out, because the reasoning is the useful part.
+
+**Everything on the map is a sticker now, not a floating surface.** `Surfaces.swift` argued
+that nothing should ever be docked to an edge in a bar — that Pokemon GO's screen works
+because each control is a small, detached object above the map. That is true of Pokemon GO
+and it was not true here: the map's chrome was the last place still using soft blurred
+elevation while every sheet and card had moved to `Sticker`, and two languages on one screen
+reads worse than either does alone. The top pills, the catch button, the player puck and the
+memory polaroids all take the 3pt outline and the hard drop now.
+
+**The three corner controls became one bar.** Three controls pinned to three corners with the
+width of the screen between them did not read as a set. `HomeBar` docks them, and the catch
+button breaks its top edge so it keeps the size its hold gauge needs. The screen got calmer,
+not heavier.
+
+The one thing allowed a soft edge is `SkyBand`, and only because it is not printed on the
+world — it is the world. A sky with a hard bottom edge is a coloured rectangle stuck to the
+screen.
 
 ### Spacing carries meaning
 
