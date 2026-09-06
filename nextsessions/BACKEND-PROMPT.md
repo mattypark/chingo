@@ -22,8 +22,13 @@ print or commit a credential.
 
 Commit after every change. Never push unless asked.
 
-Current state: 43 engine tests and 13 RLS assertions pass. Build 0.1.0 (1) is
-exported and ready. Not yet uploaded to TestFlight.
+Current state: 43 engine tests and 13 RLS assertions pass. Build 0.1.0 (3) is on
+TestFlight and VALID. The internal group "Team" and the external group "Friends & Family"
+both exist, the privacy policy is live at
+https://mattypark.github.io/chingo/site/privacy.html, and What to Test is written. External
+submission is blocked on one thing: Apple requires a contact phone number on the beta review
+record, and Matthew has not supplied one. Read docs/HANDOFF-TESTFLIGHT.md for what a Release
+build does differently.
 
 Start by telling me what you can see in App Store Connect for ChinGo and what is
 blocking the first TestFlight build.
