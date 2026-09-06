@@ -16,6 +16,8 @@ import SwiftUI
 ///   - Where the attack rows would sit: one move, written by the friend who caught you.
 ///   - Where the retreat strip would sit: the history — met, places, catches.
 public struct CardView: View {
+    @Environment(\.accent) private var accent
+
     private let face: CardFace
     private let width: CGFloat
 
@@ -64,7 +66,7 @@ public struct CardView: View {
         face.tier == 3
             ? AnyShapeStyle(
                 AngularGradient(
-                    colors: [Ink.tierRide, Ink.signal, Ink.tierRide, Ink.jade, Ink.tierRide],
+                    colors: [Ink.tierRide, accent.signal, Ink.tierRide, Ink.jade, Ink.tierRide],
                     center: .center
                 )
               )

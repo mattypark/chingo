@@ -61,6 +61,15 @@ private struct RootView: View {
         !justOnboarded && !(me.first?.hasOnboarded ?? false)
     }
 
+    /// The colour the player chose, resolved from the index in their record.
+    ///
+    /// Read here and pushed into the environment once, rather than looked up per view: this
+    /// is the only place in the app that knows both the store and the whole view tree, and a
+    /// `@Query` repeated inside every orb and button would be the same fetch many times over.
+    private var accent: Accent {
+        Accent.at(me.first?.bannerTint ?? Accent.fallback.id)
+    }
+
     var body: some View {
         ZStack {
             MapScreen(state: state, location: location)
@@ -77,6 +86,12 @@ private struct RootView: View {
                     .transition(.identity)   // SplashView animates its own exit
             }
         }
+        .environment(\.accent, accent)
+        // Covers the system's own uses of the accent -- the caret in the handle field, the
+        // selection in the date wheel. The asset catalogue's AccentColor cannot follow a
+        // choice made at runtime, so it stays the shipped coral and this overrides it.
+        .tint(accent.signal)
+        .animation(Motion.surface, value: accent)
     }
 }
 

@@ -23,11 +23,11 @@ public enum Ink {
     public static let onSignal = Color(hex: 0xFFFDF7)
 
     // MARK: Signal
-
-    /// The one loud colour: the catch button, the level ring, anything that means "act".
-    /// Deliberately warm — the whole category is Niantic blue and Snap yellow.
-    public static let signal = Color(hex: 0xFF5A3C)
-    public static let signalDeep = Color(hex: 0xD93B20)
+    //
+    // The one loud colour is not here. It is the one colour the player owns, so it lives in
+    // `Accent` and arrives through `@Environment(\.accent)` — a `static let` cannot change
+    // and cannot tell SwiftUI that it did. `Accent.all[0]` is the coral this file used to
+    // hold, unchanged, so an install that never opens the picker looks exactly as it did.
 
     /// The calm counterweight. Water on the map, secondary chips, "you're safe" states.
     public static let jade = Color(hex: 0x2FB8A0)

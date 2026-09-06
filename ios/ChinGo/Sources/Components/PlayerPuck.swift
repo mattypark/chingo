@@ -7,6 +7,8 @@ import ChinGoDesign
 /// feel like a game rather than a navigation tool, and it is the most load-bearing decision
 /// on this screen.
 struct PlayerPuck: View {
+    @Environment(\.accent) private var accent
+
     var level: Int
     var progress: Double
 
@@ -27,7 +29,7 @@ struct PlayerPuck: View {
 
                 Circle()
                     .trim(from: 0, to: max(0.02, progress))
-                    .stroke(Ink.signal, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .stroke(accent.signal, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .padding(3)
 
@@ -41,10 +43,10 @@ struct PlayerPuck: View {
             // gauge unreadable at exactly the moment it matters.
             Text("\(level)")
                 .font(.custom(Typeface.bagel, size: 12))
-                .foregroundStyle(Ink.onSignal)
+                .foregroundStyle(accent.onSignal)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 2)
-                .background(Capsule().fill(Ink.signal))
+                .background(Capsule().fill(accent.signal))
                 .overlay(Capsule().stroke(Ink.groundRaised, lineWidth: 2))
                 .offset(y: -9)
                 .shadow(color: Ink.shade, radius: 4, y: 2)

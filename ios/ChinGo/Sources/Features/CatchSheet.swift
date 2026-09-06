@@ -14,6 +14,8 @@ import ChinGoEngine
 /// A real SNAP will also require the other phone to accept, using findi's proximity
 /// handshake. That lands at stage 5; the record this writes is already shaped for it.
 struct CatchSheet: View {
+    @Environment(\.accent) private var accent
+
     let cell: String
     let placeLabel: String?
     let coordinate: (lat: Double, lon: Double)
@@ -59,10 +61,10 @@ struct CatchSheet: View {
             Button(action: save) {
                 Text(image == nil ? "Save without a photo" : "Catch")
                     .font(.chinShout)
-                    .foregroundStyle(canSave ? Ink.onSignal : Ink.textFaint)
+                    .foregroundStyle(canSave ? accent.onSignal : Ink.textFaint)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Capsule().fill(canSave ? Ink.signal : Ink.groundSunk))
+                    .background(Capsule().fill(canSave ? accent.signal : Ink.groundSunk))
             }
             .buttonStyle(SquashButtonStyle())
             .disabled(!canSave)

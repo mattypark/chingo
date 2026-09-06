@@ -7,6 +7,8 @@ import ChinGoDesign
 /// the five screens cannot drift apart — onboarding that changes its own layout between steps
 /// reads as five screens rather than one flow.
 struct OnboardingStep<Content: View>: View {
+    @Environment(\.accent) private var accent
+
     enum Art {
         case bearFull, bearCorner
     }
@@ -56,7 +58,7 @@ struct OnboardingStep<Content: View>: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Space.step)
             }
-            .buttonStyle(StickerButtonStyle(fill: Ink.signal, radius: Radius.surface))
+            .buttonStyle(StickerButtonStyle(fill: accent.signal, radius: Radius.surface))
             .hitTarget()
 
             if let secondary {

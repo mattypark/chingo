@@ -23,6 +23,8 @@ import ChinGoDesign
 /// rather than playing a stock excited clip. Direction-specific reaction reads as noticing
 /// you; a generic clip reads as decoration.
 struct MascotOrb: View {
+    @Environment(\.accent) private var accent
+
     var level: Int
     var progress: Double
     /// Screen-relative direction of the nearest thing worth noticing, in degrees, or nil.
@@ -89,7 +91,7 @@ struct MascotOrb: View {
 
                 Circle()
                     .trim(from: 0, to: max(0.02, progress))
-                    .stroke(Ink.signal, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .stroke(accent.signal, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .padding(2)
 
@@ -108,10 +110,10 @@ struct MascotOrb: View {
 
                 Text("\(level)")
                     .font(.custom(Typeface.bagel, size: 11))
-                    .foregroundStyle(Ink.onSignal)
+                    .foregroundStyle(accent.onSignal)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
-                    .background(Capsule().fill(Ink.signal))
+                    .background(Capsule().fill(accent.signal))
                     .overlay(Capsule().stroke(Ink.groundRaised, lineWidth: 2))
                     .offset(y: 26)
             }

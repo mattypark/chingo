@@ -10,6 +10,8 @@ import ChinGoEngine
 /// controls are small rounded objects detached from the edges. Everything specific to
 /// Niantic is absent: no sphere, no aim ring, no gym pillars, no basemap of theirs.
 struct MapScreen: View {
+    @Environment(\.accent) private var accent
+
     @Bindable var state: MapState
     @Environment(\.modelContext) private var context
     @Query private var memories: [MemoryRecord]
@@ -275,7 +277,7 @@ struct MapScreen: View {
                     HStack(spacing: 6) {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Ink.signal)
+                            .foregroundStyle(accent.signal)
                         Text("\(state.streakWeeks)")
                             .font(.custom(Typeface.bagel, size: 14))
                             .foregroundStyle(Ink.text)
@@ -359,7 +361,7 @@ struct MapScreen: View {
                     FloatingOrb(diameter: 44, action: { camera.recenter(course: location.course) }) {
                         Image(systemName: "location.north.line.fill")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Ink.signal)
+                            .foregroundStyle(accent.signal)
                             .rotationEffect(.degrees(-camera.bearing))
                     }
                     .accessibilityLabel("Face the way you are walking")
@@ -379,58 +381,13 @@ struct MapScreen: View {
     }
 }
 
-/// You, bottom-left.
-private struct ProfileOrb: View {
-    let level: Int
-    let progress: Double
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                Circle()
-                    .fill(Ink.groundRaised)
-                    .elevated(.float)
-
-                Circle()
-                    .stroke(Ink.groundSunk, lineWidth: 3)
-                    .padding(2)
-
-                Circle()
-                    .trim(from: 0, to: max(0.02, progress))
-                    .stroke(Ink.signal, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .padding(2)
-
-                Image(systemName: "person.fill")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Ink.textSoft)
-
-                Text("\(level)")
-                    .font(.custom(Typeface.bagel, size: 11))
-                    .foregroundStyle(Ink.onSignal)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(Ink.signal))
-                    .overlay(Capsule().stroke(Ink.groundRaised, lineWidth: 2))
-                    .offset(y: 26)
-            }
-            // Tall enough to contain the badge hanging below the circle. Sizing this to the
-            // circle alone lets the badge fall outside the frame, where the stack clips it
-            // and — at the bottom-left corner — the screen edge cuts it in half.
-            .frame(width: 58, height: 76, alignment: .top)
-        }
-        .buttonStyle(SquashButtonStyle())
-        .hitTarget()
-        .accessibilityLabel("You, level \(level)")
-    }
-}
-
 /// What a memory pin opens into.
 ///
 /// One button. The whole feature exists to produce a message to a person you had stopped
 /// thinking about, so anything else on this sheet is in the way.
 struct MemorySheet: View {
+    @Environment(\.accent) private var accent
+
     let memory: MemoryRecord
     var onReconnect: () -> Void
 
@@ -480,10 +437,10 @@ struct MemorySheet: View {
             } label: {
                 Text("Reconnect")
                     .font(.chinShout)
-                    .foregroundStyle(Ink.onSignal)
+                    .foregroundStyle(accent.onSignal)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Capsule().fill(Ink.signal))
+                    .background(Capsule().fill(accent.signal))
             }
             .buttonStyle(SquashButtonStyle())
         }

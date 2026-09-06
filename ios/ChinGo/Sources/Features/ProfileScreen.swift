@@ -11,6 +11,8 @@ import ChinGoEngine
 ///
 /// Nothing here is a number for its own sake. Every count is something that happened.
 struct ProfileScreen: View {
+    @Environment(\.accent) private var accent
+
     let state: MapState
 
     @Query(sort: \FriendRecord.metDate, order: .reverse) private var friends: [FriendRecord]
@@ -93,7 +95,7 @@ struct ProfileScreen: View {
                     .strokeBorder(Ink.text, lineWidth: 3)
                 Circle()
                     .trim(from: 0, to: max(0.02, state.levelProgress))
-                    .stroke(Ink.signal, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .stroke(accent.signal, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .padding(6)
                 Image("Mascot")
@@ -146,7 +148,7 @@ struct ProfileScreen: View {
                     .padding(.horizontal, Space.inset)
                     .padding(.vertical, Space.tight)
             }
-            .buttonStyle(StickerButtonStyle(fill: Ink.signal, radius: Radius.surface))
+            .buttonStyle(StickerButtonStyle(fill: accent.signal, radius: Radius.surface))
             .hitTarget()
             .padding(.top, Space.snug)
         }

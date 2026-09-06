@@ -20,6 +20,8 @@ public struct CatchButton: View {
     private let action: () -> Void
     private let longPress: (() -> Void)?
 
+    @Environment(\.accent) private var accent
+
     @State private var pulse = false
     @State private var fill: CGFloat = 0
     @State private var wave: CGFloat = 0
@@ -47,25 +49,25 @@ public struct CatchButton: View {
             // forever teaches people to ignore it.
             if enabled {
                 Circle()
-                    .stroke(Ink.signal.opacity(0.30), lineWidth: 3)
+                    .stroke(accent.signal.opacity(0.30), lineWidth: 3)
                     .scaleEffect(pulse ? 1.28 : 1)
                     .opacity(pulse ? 0 : 1)
             }
 
             Circle()
-                .fill(enabled ? Ink.signal : Ink.groundSunk)
-                .shadow(color: enabled ? Ink.signalDeep.opacity(0.35) : .clear, radius: 14, y: 6)
+                .fill(enabled ? accent.signal : Ink.groundSunk)
+                .shadow(color: enabled ? accent.signalDeep.opacity(0.35) : .clear, radius: 14, y: 6)
                 .shadow(color: Ink.shade, radius: 10, y: 4)
 
             // The water. Lighter than the button so the level is legible against it, and
             // clipped to the circle so it reads as filling the button rather than sitting on
             // top of it.
             LiquidFill(progress: fill, phase: wave)
-                .fill(Ink.onSignal.opacity(0.42))
+                .fill(accent.onSignal.opacity(0.42))
                 .clipShape(Circle())
 
             LinkGlyph()
-                .fill(enabled ? Ink.onSignal : Ink.textFaint, style: LinkGlyph.fillStyle)
+                .fill(enabled ? accent.onSignal : Ink.textFaint, style: LinkGlyph.fillStyle)
                 .frame(width: 26 * 1.66, height: 26)
         }
         .frame(width: 78, height: 78)

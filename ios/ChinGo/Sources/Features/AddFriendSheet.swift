@@ -9,6 +9,8 @@ import ChinGoDesign
 /// decision as much as a safety one: it means the album can only ever fill up with people
 /// you actually met.
 struct AddFriendSheet: View {
+    @Environment(\.accent) private var accent
+
     let cell: String
     let placeLabel: String?
 
@@ -44,10 +46,10 @@ struct AddFriendSheet: View {
             Button(action: add) {
                 Text("Add")
                     .font(.chinShout)
-                    .foregroundStyle(canAdd ? Ink.onSignal : Ink.textFaint)
+                    .foregroundStyle(canAdd ? accent.onSignal : Ink.textFaint)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Capsule().fill(canAdd ? Ink.signal : Ink.groundSunk))
+                    .background(Capsule().fill(canAdd ? accent.signal : Ink.groundSunk))
             }
             .buttonStyle(SquashButtonStyle())
             .disabled(!canAdd)

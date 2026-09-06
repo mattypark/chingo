@@ -22,6 +22,8 @@ struct RadialOption: Identifiable {
 /// nothing to compete with, so they do not need to shout, and a 100pt circle on a phone reads
 /// as a mistake rather than as emphasis.
 struct RadialMenu: View {
+    @Environment(\.accent) private var accent
+
     let title: String
     let options: [RadialOption]
     var onClose: () -> Void
@@ -120,7 +122,7 @@ struct RadialMenu: View {
             }
             // Opaque, outlined, hard-shadowed. The translucent-fill-with-hairline version
             // this replaces was the single most Pokemon-GO-looking thing in the app.
-            .buttonStyle(StickerCircleStyle(fill: option.isPrimary ? Ink.signal : Ink.ground))
+            .buttonStyle(StickerCircleStyle(fill: option.isPrimary ? accent.signal : Ink.ground))
             .hitTarget()
 
             MenuLabel(option.label)
