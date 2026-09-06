@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # Build ChinGo and put it on TestFlight.
 #
-#   ./scripts/testflight.sh            archive + export a signed .ipa
-#   ./scripts/testflight.sh --upload   also upload it to App Store Connect
+#   ./scripts/testflight.sh                archive + export a signed .ipa
+#   ./scripts/testflight.sh --upload       also upload it to App Store Connect
+#   ./scripts/testflight.sh --upload-only  upload the .ipa already in build/, no rebuild
 #
 # The build number is bumped automatically. App Store Connect rejects a build whose number it
 # has already seen, and doing it by hand is how you lose ten minutes to a duplicate-build
 # error after a five-minute archive.
+#
+# --upload-only exists because the bump happens BEFORE the archive. Re-running the normal path
+# to upload an .ipa you already exported throws that .ipa away and gives you a new build
+# number for identical code — so the build you tested is not the build anyone installs.
 #
 # UPLOADING needs credentials, and there are two ways. Pick one, once.
 #
@@ -35,27 +40,41 @@ cd "$(dirname "$0")/.."
 BUILD_DIR="build/testflight"
 ARCHIVE="$BUILD_DIR/ChinGo.xcarchive"
 EXPORT="$BUILD_DIR/export"
+IPA="$EXPORT/ChinGo.ipa"
 
-mkdir -p "$BUILD_DIR"
-rm -rf "$ARCHIVE" "$EXPORT"
+MODE="${1:-}"
 
-# --- bump the build number -------------------------------------------------
-current=$(grep -E 'CURRENT_PROJECT_VERSION:' ios/project.yml | head -1 | sed -E 's/[^0-9]//g')
-next=$((current + 1))
-sed -i '' -E "s/CURRENT_PROJECT_VERSION: \"?${current}\"?/CURRENT_PROJECT_VERSION: \"${next}\"/" ios/project.yml
-version=$(grep -E 'MARKETING_VERSION:' ios/project.yml | head -1 | sed -E 's/.*"(.*)".*/\1/')
-echo "Building ${version} (${next})"
+if [[ "$MODE" == "--upload-only" ]]; then
+  if [[ ! -f "$IPA" ]]; then
+    echo "No .ipa at $IPA. Run without --upload-only to build one first." >&2
+    exit 1
+  fi
+  version=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleShortVersionString' \
+    "$ARCHIVE/Info.plist" 2>/dev/null || echo '?')
+  build=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleVersion' \
+    "$ARCHIVE/Info.plist" 2>/dev/null || echo '?')
+  echo "Uploading the existing ${version} (${build}) — nothing is rebuilt and nothing is bumped."
+else
+  mkdir -p "$BUILD_DIR"
+  rm -rf "$ARCHIVE" "$EXPORT"
 
-cd ios
-xcodegen generate --spec project.yml >/dev/null
+  # --- bump the build number -----------------------------------------------
+  current=$(grep -E 'CURRENT_PROJECT_VERSION:' ios/project.yml | head -1 | sed -E 's/[^0-9]//g')
+  next=$((current + 1))
+  sed -i '' -E "s/CURRENT_PROJECT_VERSION: \"?${current}\"?/CURRENT_PROJECT_VERSION: \"${next}\"/" ios/project.yml
+  version=$(grep -E 'MARKETING_VERSION:' ios/project.yml | head -1 | sed -E 's/.*"(.*)".*/\1/')
+  echo "Building ${version} (${next})"
 
-# --- archive ---------------------------------------------------------------
-xcodebuild -project ChinGo.xcodeproj -scheme ChinGo -configuration Release \
-  -destination 'generic/platform=iOS' -archivePath "../$ARCHIVE" \
-  -allowProvisioningUpdates archive | tail -3
+  cd ios
+  xcodegen generate --spec project.yml >/dev/null
 
-# --- export ----------------------------------------------------------------
-cat > "../$BUILD_DIR/ExportOptions.plist" <<'PLIST'
+  # --- archive -------------------------------------------------------------
+  xcodebuild -project ChinGo.xcodeproj -scheme ChinGo -configuration Release \
+    -destination 'generic/platform=iOS' -archivePath "../$ARCHIVE" \
+    -allowProvisioningUpdates archive | tail -3
+
+  # --- export --------------------------------------------------------------
+  cat > "../$BUILD_DIR/ExportOptions.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -69,17 +88,17 @@ cat > "../$BUILD_DIR/ExportOptions.plist" <<'PLIST'
 </plist>
 PLIST
 
-xcodebuild -exportArchive -archivePath "../$ARCHIVE" \
-  -exportOptionsPlist "../$BUILD_DIR/ExportOptions.plist" \
-  -exportPath "../$EXPORT" -allowProvisioningUpdates | tail -2
+  xcodebuild -exportArchive -archivePath "../$ARCHIVE" \
+    -exportOptionsPlist "../$BUILD_DIR/ExportOptions.plist" \
+    -exportPath "../$EXPORT" -allowProvisioningUpdates | tail -2
 
-cd ..
-IPA="$EXPORT/ChinGo.ipa"
-echo
-echo "Built: $IPA"
+  cd ..
+  echo
+  echo "Built: $IPA"
+fi
 
 # --- upload ----------------------------------------------------------------
-if [[ "${1:-}" == "--upload" ]]; then
+if [[ "$MODE" == "--upload" || "$MODE" == "--upload-only" ]]; then
   # Written by scripts/asc-setup.sh, so a single API key covers uploading and the MCP and
   # there is nothing to add to your shell profile.
   if [[ -f "$HOME/.config/asc-mcp/asc.env" ]]; then
@@ -103,7 +122,7 @@ if [[ "${1:-}" == "--upload" ]]; then
   echo
   echo "Uploaded. Processing takes 5-15 minutes; the build is genuinely not in TestFlight"
   echo "until that finishes. You will get an email either way."
-else
+elif [[ -z "$MODE" ]]; then
   echo
   echo "To upload:"
   echo "  ./scripts/testflight.sh --upload"
