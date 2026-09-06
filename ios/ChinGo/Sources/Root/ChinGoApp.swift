@@ -28,6 +28,7 @@ struct ChinGoApp: App {
 
         #if DEBUG
         DemoSeed.populate(ModelContext(container))
+        DemoSeed.populate(state)
         #endif
     }
 

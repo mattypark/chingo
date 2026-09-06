@@ -65,6 +65,22 @@ enum DemoSeed {
         return args[args.index(after: i)]
     }
 
+    /// Presence, which does not live in the store.
+    ///
+    /// `MapState.nearby` stays empty until the backend wires real presence, so without this
+    /// the rail has nothing to draw and cannot be looked at. Same flag, same idempotence.
+    @MainActor
+    static func populate(_ state: MapState) {
+        guard isRequested, state.nearby.isEmpty else { return }
+        state.nearby = [
+            NearbyPerson(id: "n-priya", handle: "priya", approxMetres: 40),
+            NearbyPerson(id: "n-sam", handle: "sam", approxMetres: 80),
+            NearbyPerson(id: "n-marcus", handle: "marcus", approxMetres: 120),
+            NearbyPerson(id: "n-dana", handle: "dana", approxMetres: 160),
+            NearbyPerson(id: "n-wren", handle: "wren", approxMetres: 200),
+        ]
+    }
+
     static func populate(_ context: ModelContext) {
         if resetsOnboarding {
             let existing = (try? context.fetch(FetchDescriptor<MeRecord>())) ?? []

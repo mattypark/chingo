@@ -28,6 +28,8 @@ struct MapScreen: View {
     @State private var showAlbum = false
     @State private var showAddFriend = false
     @State private var catchPulse = 0
+    /// Which name in the nearby rail is in focus.
+    @State private var focusedNearby = 0
     /// The photo currently flying into the album, if any.
     @State private var flying: UIImage?
     @State private var flown = false
@@ -104,9 +106,11 @@ struct MapScreen: View {
             memoryLayer
             PlayerPuck(level: state.level, progress: state.levelProgress)
 
-            VStack {
+            VStack(spacing: 0) {
                 topBar
-                Spacer()
+                Spacer(minLength: Space.step)
+                NearbyRail(people: state.nearby, focused: $focusedNearby)
+                Spacer(minLength: Space.step)
                 bottomBar
             }
             .padding(.horizontal, Space.inset)
