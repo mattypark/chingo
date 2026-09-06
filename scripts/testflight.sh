@@ -80,6 +80,13 @@ echo "Built: $IPA"
 
 # --- upload ----------------------------------------------------------------
 if [[ "${1:-}" == "--upload" ]]; then
+  # Written by scripts/asc-setup.sh, so a single API key covers uploading and the MCP and
+  # there is nothing to add to your shell profile.
+  if [[ -f "$HOME/.config/asc-mcp/asc.env" ]]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.config/asc-mcp/asc.env"
+  fi
+
   if [[ -n "${ASC_APPLE_ID:-}" ]]; then
     echo "Uploading as $ASC_APPLE_ID..."
     xcrun altool --upload-app --type ios --file "$IPA" \
