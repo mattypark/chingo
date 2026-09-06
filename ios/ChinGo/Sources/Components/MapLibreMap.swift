@@ -62,6 +62,8 @@ struct MapLibreMap: UIViewRepresentable {
         // also the only affordance telling a curious user where the map came from.
         map.attributionButton.tintColor = UIColor(Ink.textFaint)
 
+        map.delegate = context.coordinator
+        context.coordinator.aim = { map in camera(for: map, heading: bearing) }
         map.setCamera(camera(for: map, heading: bearing), animated: false)
 
         return map
@@ -69,15 +71,36 @@ struct MapLibreMap: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    /// Holds the zoom the map was last given. `MLNMapView.zoomLevel` is derived from altitude
-    /// and drifts by a hair, so comparing against it directly reports a change every frame.
-    final class Coordinator {
+    /// Keeps the camera the representable last asked for, and puts it back once the style is up.
+    ///
+    /// `MLNMapView` adopts the style's own default camera when the style finishes loading, and
+    /// that lands well after `makeUIView` has already pointed the camera at the player --
+    /// tiles come over the network. `chingo-style.json` declares no `center` or `zoom`, so the
+    /// default it adopts is the whole planet at zoom 0.
+    ///
+    /// `updateUIView` cannot rescue it either: it only fires when one of the four inputs
+    /// changes, and until a fix lands `coordinateOrFallback` returns the same constant every
+    /// time. Without a fix -- the simulator always, a real device indoors, anyone who declined
+    /// location -- the map opens over the Atlantic and stays there. Re-aiming on
+    /// `didFinishLoading` is what makes it open where the player is standing.
+    final class Coordinator: NSObject, MLNMapViewDelegate {
+        /// `MLNMapView.zoomLevel` is derived from altitude and drifts by a hair, so comparing
+        /// against it directly reports a change every frame.
         var lastZoom: Double = .nan
+
+        /// The camera most recently asked for, replayed once the style is ready.
+        var aim: ((MLNMapView) -> MLNMapCamera)?
+
+        func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
+            guard let aim else { return }
+            mapView.setCamera(aim(mapView), animated: false)
+        }
     }
 
     func updateUIView(_ map: MLNMapView, context: Context) {
         let lastZoom = context.coordinator.lastZoom
         context.coordinator.lastZoom = zoom
+        context.coordinator.aim = { map in camera(for: map, heading: bearing) }
         // A drag must land on the same frame it happens on, or looking around feels like
         // steering a boat. Position changes still ease, because a camera that snaps to every
         // GPS fix reads as jitter even when the fixes are good.
