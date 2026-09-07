@@ -105,7 +105,7 @@ struct MapScreen: View {
                 )
                 .ignoresSafeArea()
             // Above the map, below everything printed on it.
-            SkyBand(latitude: here.lat, longitude: here.lon)
+            SkyBand(latitude: here.lat, longitude: here.lon, bearing: camera.bearing)
 
             memoryLayer
             PlayerPuck(level: state.level, progress: state.levelProgress)

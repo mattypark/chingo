@@ -56,7 +56,7 @@ enum MapStyle {
 
         let destination = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("chingo-style-\(accent.id).json")
+            .appendingPathComponent("chingo-style-\(accent.id)-v2.json")
 
         if FileManager.default.fileExists(atPath: destination.path) { return destination }
 
@@ -71,7 +71,7 @@ enum MapStyle {
         }
 
         let table = swaps(for: accent)
-        let painted = repaint(root, using: table)
+        let painted = widenStreets(repaint(root, using: table))
 
         guard
             let out = try? JSONSerialization.data(withJSONObject: painted),
@@ -92,6 +92,62 @@ enum MapStyle {
     /// The colour the ground actually ends up. `MapScreen` paints this behind the map so the
     /// frame or two before tiles arrive is the same shade as the frame after.
     static func ground(for accent: Accent) -> Color { accent.washing(Ink.mapLand) }
+
+    /// How much wider the roads get.
+    ///
+    /// The basemap comes from a navigation style, where a road is a line telling you a route
+    /// exists. Here the street is the floor you are standing on -- the camera is raked along
+    /// it and it should read as ground with width, not as a drawn route. Everything else in
+    /// the style stays as it is; only the carriageway and its casing grow.
+    private static let streetScale: Double = 1.75
+
+    /// Layers whose lines are not streets and must not grow with them.
+    private static let notStreets = ["waterway", "boundary", "admin", "aeroway", "ferry", "rail"]
+
+    /// Scales `line-width` and `line-gap-width` on the road layers.
+    ///
+    /// The widths are `interpolate` expressions -- `[op, curve, input, zoom, width, zoom,
+    /// width, ...]` -- so only the output half of each stop is scaled. Multiplying the zoom
+    /// stops as well would move where the roads change width rather than how wide they are,
+    /// which looks like the map zooming on its own.
+    private static func widenStreets(_ root: Any) -> Any {
+        guard var document = root as? [String: Any],
+              let layers = document["layers"] as? [[String: Any]] else { return root }
+
+        document["layers"] = layers.map { layer -> [String: Any] in
+            guard layer["type"] as? String == "line",
+                  let id = layer["id"] as? String,
+                  !notStreets.contains(where: { id.contains($0) }),
+                  var paint = layer["paint"] as? [String: Any]
+            else { return layer }
+
+            var widened = layer
+            for key in ["line-width", "line-gap-width"] {
+                guard let value = paint[key] else { continue }
+                paint[key] = scaleOutputs(value)
+            }
+            widened["paint"] = paint
+            return widened
+        }
+        return document
+    }
+
+    /// Multiplies the widths an expression produces, leaving the zooms it keys off alone.
+    private static func scaleOutputs(_ value: Any) -> Any {
+        if let number = value as? Double { return number * streetScale }
+        if let number = value as? Int { return Double(number) * streetScale }
+        guard var parts = value as? [Any], parts.count > 3,
+              parts.first as? String == "interpolate" else { return value }
+
+        // index 0 op, 1 curve, 2 input, then alternating stop-in / stop-out.
+        var index = 4
+        while index < parts.count {
+            if let number = parts[index] as? Double { parts[index] = number * streetScale }
+            else if let number = parts[index] as? Int { parts[index] = Double(number) * streetScale }
+            index += 2
+        }
+        return parts
+    }
 
     /// Walks the whole document swapping colour strings wherever they appear, including
     /// inside the `interpolate` arrays that the building ramps are built from.

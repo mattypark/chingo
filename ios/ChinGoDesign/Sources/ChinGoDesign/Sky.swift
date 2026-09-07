@@ -20,11 +20,28 @@ public enum Sky {
 
     // MARK: Solar position
 
-    /// The sun's altitude above the horizon, in degrees, at a coordinate and an instant.
+    /// Where the sun is: how high, and which way.
     ///
-    /// Negative below the horizon. Around -0.83 is geometric sunrise once refraction is
-    /// allowed for, which is why the twilight bands below are cut where they are.
+    /// `altitude` is degrees above the horizon, negative below it. `azimuth` is degrees
+    /// clockwise from true north, so 90 is due east and 270 due west.
+    public struct Position: Sendable, Equatable {
+        public let altitude: Double
+        public let azimuth: Double
+
+        public init(altitude: Double, azimuth: Double) {
+            self.altitude = altitude
+            self.azimuth = azimuth
+        }
+    }
+
+    /// The sun's altitude above the horizon, in degrees, at a coordinate and an instant.
     public static func altitude(latitude: Double, longitude: Double, at date: Date = .now) -> Double {
+        position(latitude: latitude, longitude: longitude, at: date).altitude
+    }
+
+    /// Altitude and azimuth together, since both fall out of the same hour angle and
+    /// declination and computing them separately would do the work twice.
+    public static func position(latitude: Double, longitude: Double, at date: Date = .now) -> Position {
         let julianDay = date.timeIntervalSince1970 / 86_400 + 2_440_587.5
         let t = (julianDay - 2_451_545) / 36_525
 
@@ -65,13 +82,28 @@ public enum Sky {
         let minutesUTC = dayFraction * 1_440
 
         let trueSolarTime = minutesUTC + equationOfTime + 4 * longitude
-        let hourAngle = trueSolarTime / 4 - 180
+        // Folded into -180...180. Far from Greenwich the raw value lands well outside it --
+        // San Francisco at 01:00 UTC gives -289 degrees -- and while `cos` does not care,
+        // the sign of this is what separates morning from afternoon further down. Left
+        // unfolded, an evening sun in California reads as a morning one and comes up in the
+        // east at six in the evening.
+        let hourAngle = mod360(trueSolarTime / 4 - 180 + 180) - 180
 
         let cosZenith =
             sin(rad(latitude)) * sin(declination)
             + cos(rad(latitude)) * cos(declination) * cos(rad(hourAngle))
+        let zenith = acos(min(max(cosZenith, -1), 1))
 
-        return 90 - deg(acos(min(max(cosZenith, -1), 1)))
+        // Azimuth from the same zenith. The denominator collapses at the poles and at exactly
+        // zenith, so it is floored rather than allowed to divide by zero.
+        let denominator = max(cos(rad(latitude)) * sin(zenith), 1e-9)
+        let cosAzimuth = (sin(declination) - sin(rad(latitude)) * cosZenith) / denominator
+        var azimuth = deg(acos(min(max(cosAzimuth, -1), 1)))
+        // acos only ever returns 0...180, so mornings and afternoons come back identical.
+        // The hour angle is what separates them: positive means the sun is past due south.
+        if hourAngle > 0 { azimuth = 360 - azimuth }
+
+        return Position(altitude: 90 - deg(zenith), azimuth: mod360(azimuth))
     }
 
     // MARK: Palette

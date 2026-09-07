@@ -59,6 +59,13 @@ struct MapLibreMap: UIViewRepresentable {
         map.allowsTilting = false
         map.allowsZooming = false
 
+        // MapLibre's own ceiling is 60 degrees, and CameraMath has always said 70. The two
+        // never agreed, and MapLibre won silently -- every "raked all the way back" view in
+        // this app was actually stopping at 60. Raised so the engine's range is reachable,
+        // and so the horizon can come into view at all: the reason it was kept off screen
+        // was that the tiles run out behind it, and there is a sky over there now.
+        map.maximumPitch = 85
+
         map.compassView.isHidden = true
         map.logoView.isHidden = true
         // The attribution button stays. OpenStreetMap's licence requires credit, and it is

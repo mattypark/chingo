@@ -77,6 +77,40 @@ struct SkyTests {
         #expect(abs(apart - 60) <= 10, "noon moved \(apart) minutes, expected about 60")
     }
 
+    // MARK: Azimuth
+
+    /// At solar noon in the northern hemisphere the sun is due south. This is the check that
+    /// says the hour-angle branch (the one that separates morning from afternoon) is the
+    /// right way round -- get it backwards and the sun rises in the west.
+    @Test("Northern-hemisphere noon puts the sun due south")
+    func noonIsSouth() {
+        let samples = stride(from: 0, to: 24 * 60, by: 5).map {
+            Sky.position(latitude: 37.7749, longitude: -122.4194, at: utc(2026, 6, 21, $0 / 60, $0 % 60))
+        }
+        let highest = samples.max { $0.altitude < $1.altitude }!
+        #expect(abs(highest.azimuth - 180) < 4, "noon azimuth was \(highest.azimuth), expected about 180")
+    }
+
+    @Test("The sun rises in the east and sets in the west")
+    func eastThenWest() {
+        func azimuth(_ hour: Int, _ minute: Int) -> Double {
+            Sky.position(latitude: 37.7749, longitude: -122.4194, at: utc(2026, 3, 20, hour, minute)).azimuth
+        }
+        // 14:00 UTC is early morning in San Francisco; 01:00 UTC is the previous evening.
+        #expect(azimuth(14, 0) < 180, "morning sun should be east of south")
+        #expect(azimuth(1, 0) > 180, "evening sun should be west of south")
+    }
+
+    @Test("Azimuth stays inside one turn")
+    func azimuthIsBounded() {
+        for hour in 0..<24 {
+            for lat in [-60.0, -20.0, 0.0, 20.0, 60.0] {
+                let a = Sky.position(latitude: lat, longitude: 0, at: utc(2026, 8, 9, hour)).azimuth
+                #expect(a >= 0 && a < 360, "azimuth \(a) out of range at lat \(lat)")
+            }
+        }
+    }
+
     // MARK: Palette
 
     @Test("Altitudes past either end clamp instead of running off the stops")

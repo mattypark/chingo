@@ -25,12 +25,29 @@ public enum Distance {
         return formatter
     }()
 
+    /// Where feet stop being the useful unit. A tenth of a mile, which is also the point the
+    /// number stops fitting in a glance.
+    private static let feetPerTenthMile: Double = 528
+
     /// `metres` is already coarsened to the cell before it reaches here. Nothing in this file
     /// is ever a real distance to a real person.
+    ///
+    /// The unit is chosen explicitly rather than left to `naturalScale`, which was happy to
+    /// say "131.2 ft" -- a decimal place on a number that was rounded to a grid square two
+    /// steps ago, and precision the app does not have and should not imply.
     public static func spoken(metres: Int) -> String {
         let base = Measurement(value: Double(metres), unit: UnitLength.meters)
-        let metric = Locale.current.measurementSystem == .metric
-        return formatter.string(from: metric ? base : base.converted(to: .feet))
+
+        if Locale.current.measurementSystem == .metric {
+            let whole = base.value < 1000
+            formatter.numberFormatter.maximumFractionDigits = whole ? 0 : 1
+            return formatter.string(from: whole ? base : base.converted(to: .kilometers))
+        }
+
+        let feet = base.converted(to: .feet)
+        let short = feet.value < feetPerTenthMile
+        formatter.numberFormatter.maximumFractionDigits = short ? 0 : 1
+        return formatter.string(from: short ? feet : base.converted(to: .miles))
     }
 
     /// "about 400 ft away" -- the sentence, not just the number.

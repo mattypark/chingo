@@ -15,9 +15,18 @@ final class MapCamera {
     /// Compass bearing the camera faces, in degrees.
     private(set) var bearing: CLLocationDirection = 0
     /// How far the camera is raked back. 0 looks straight down; 70 is nearly at street level.
-    private(set) var pitch: CGFloat = 58
-    /// How close in. A city opens at `CameraMath.defaultZoom`.
-    private(set) var zoom: Double = CameraMath.defaultZoom
+    ///
+    /// Opens at the engine's maximum rather than short of it. Looking down at a city from
+    /// above reads as a map; looking along it reads as standing in it, and the second one is
+    /// the whole point of the screen.
+    private(set) var pitch: CGFloat = 70
+    /// How close in.
+    ///
+    /// Deliberately above `CameraMath.defaultZoom`. At 17.2 you can see six blocks, which is
+    /// a navigation app's answer -- it tells you where you are in the city. This screen wants
+    /// the opposite: the street you are standing on, close enough that its name is readable
+    /// and the buildings on it have mass.
+    private(set) var zoom: Double = 18.4
 
     /// True while the camera follows the direction of travel. A drag hands control to the
     /// user and it stays handed over until they explicitly ask for it back — a camera that

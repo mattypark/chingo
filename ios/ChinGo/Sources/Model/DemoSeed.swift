@@ -70,6 +70,19 @@ enum DemoSeed {
         return Double(args[args.index(after: i)])
     }
 
+    /// `-skyAzimuth 0` puts the sun straight ahead regardless of the real time of day.
+    ///
+    /// Sibling of `-skyAltitude`. Forcing the height without the direction leaves the sun
+    /// wherever it genuinely is, which at most hours is behind you and off screen -- so the
+    /// one thing the flag exists to show you is the one thing you cannot see.
+    static var skyAzimuth: Double? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-skyAzimuth"), args.index(after: i) < args.endIndex else {
+            return nil
+        }
+        return Double(args[args.index(after: i)])
+    }
+
     static var onboardStep: String? {
         let args = ProcessInfo.processInfo.arguments
         guard let i = args.firstIndex(of: "-onboardStep"), args.index(after: i) < args.endIndex else {

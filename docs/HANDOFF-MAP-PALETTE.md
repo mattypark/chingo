@@ -73,3 +73,24 @@ non-landuse fills fall through to `land` rather than to a second ground colour.
 Once the generated style is correct at the source, `MapStyle` should keep only the accent
 wash and drop the `corrections` table. It is written so that deleting entries from that one
 dictionary is the whole change.
+
+
+---
+
+# A night style
+
+Second ask, same file. `SkyBand` now dims the map as the real sun goes down, and it can only
+go so far: the basemap is a daylight style. Street names are `#6B655A` on a `#F6F2E7` halo,
+chosen to sit on cream. Darken the ground under them and they are the first thing to go, so
+the dusk layer is capped at 34% and evening is as far as it can honestly reach.
+
+A real night needs the style to have a night variant -- ground, buildings and, above all,
+label and halo colours inverted. That is `build-style.py`'s to emit. Frontend can switch
+between two style files at runtime the same way it already switches between eight accent-tinted
+ones: `MapStyle.url(for:)` is already keyed on something, and adding a second dimension to
+that key is a small change here once there is a second style to point at.
+
+Worth knowing before you build it: Pokemon GO drives its whole map tint from one sky state
+rather than keeping a separate night theme, and its terrain desaturates to match the sky. If
+`build-style.py` emitted the label and halo colours as the only night-specific values, the
+frontend wash could keep doing the rest.
