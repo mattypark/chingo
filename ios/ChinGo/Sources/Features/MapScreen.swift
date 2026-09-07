@@ -27,6 +27,7 @@ struct MapScreen: View {
     @State private var showCatch = false
     @State private var showAlbum = false
     @State private var showAddFriend = false
+    @State private var showMyHandle = false
     @State private var catchPulse = 0
     /// Which name in the nearby rail is in focus.
     @State private var focusedNearby = 0
@@ -130,9 +131,13 @@ struct MapScreen: View {
                     // top-right pill on the map, where it belongs — it is a state you are in,
                     // not an errand you run, and having it in two places made it read as a
                     // fourth destination.
+                    //
+                    // Profile is gone for the same reason: tapping the bear in the bar opens
+                    // it, so a second door to it was a menu row spent on nothing. Its slot
+                    // went to the other half of "Add someone" — the handle you hand over.
                     options: [
                         RadialOption(icon: "person.badge.plus", label: "Add someone") { showAddFriend = true },
-                        RadialOption(icon: "person.fill", label: "Profile") { showProfile = true },
+                        RadialOption(icon: "at", label: "My handle") { showMyHandle = true },
                         RadialOption(icon: "square.grid.2x2.fill", label: "Album") { showAlbum = true },
                     ],
                     onClose: { deckMenu = false }
@@ -239,7 +244,14 @@ struct MapScreen: View {
                 .onDisappear { state.award(.caught) }
         }
         .sheet(isPresented: $showAddFriend) {
-            AddFriendSheet(cell: cell, placeLabel: location.placeLabel)
+            AddFriendSheet(cell: cell, placeLabel: location.placeLabel, nearby: state.nearby)
+                // Taller than it was: the sheet now leads with everyone standing around you
+                // rather than with an empty text field.
+                .presentationDetents([.large])
+                .presentationCornerRadius(30)
+        }
+        .sheet(isPresented: $showMyHandle) {
+            MyHandleSheet()
                 .presentationDetents([.height(470)])
                 .presentationCornerRadius(30)
         }

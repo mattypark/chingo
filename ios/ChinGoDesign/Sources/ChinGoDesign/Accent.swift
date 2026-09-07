@@ -110,6 +110,25 @@ public struct Accent: Identifiable, Sendable, Equatable, Hashable {
     /// What a brand-new store gets before anyone has chosen.
     public static let fallback = all[0]
 
+    /// The light end of the accent.
+    ///
+    /// A takeover field needs three steps the way the berry one did -- deep at the top, the
+    /// signal in the middle, lighter at the bottom -- so the lightest ground ends up under
+    /// the controls, where the contrast is needed. Derived rather than hand-picked because
+    /// eight more hand-tuned hexes is eight more things to drift; the deep step is already
+    /// hand-picked and this one only ever has to be lighter than it.
+    ///
+    /// It is also what a glyph is drawn in on an ink slab, where the signal itself is too
+    /// dark for the darker half of the set -- violet on ink is 2.8:1.
+    public var signalLift: Color {
+        let base = signal.resolve(in: EnvironmentValues())
+        func lift(_ channel: Float) -> Double { Double(channel) + (1 - Double(channel)) * 0.42 }
+        return Color(
+            .sRGB,
+            red: lift(base.red), green: lift(base.green), blue: lift(base.blue), opacity: 1
+        )
+    }
+
     /// How much of the accent reaches the basemap. Enough to tell two players' maps apart at
     /// a glance, far short of enough to make the map itself the loud thing.
     public static let washStrength: Double = 0.10

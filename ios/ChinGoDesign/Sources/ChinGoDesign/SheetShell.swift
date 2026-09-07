@@ -51,9 +51,21 @@ public struct SheetShell<Content: View>: View {
 /// — it is the way out, not the thing to do, and a persimmon close button on a sheet whose
 /// primary action is already persimmon reads as a choice between equals.
 public struct CloseButton: View {
+
+    /// What it is sitting on, which decides which way round it is drawn.
+    public enum Ground {
+        /// A cream sheet. The button is cream with an ink mark, like every other object here.
+        case sheet
+        /// A full-bleed colour field. Inverted, because a cream disc on a colour field is a
+        /// hole punched in it -- the same reason the menu rows are ink.
+        case field
+    }
+
+    private let ground: Ground
     private let action: () -> Void
 
-    public init(action: @escaping () -> Void) {
+    public init(on ground: Ground = .sheet, action: @escaping () -> Void) {
+        self.ground = ground
         self.action = action
     }
 
@@ -61,10 +73,14 @@ public struct CloseButton: View {
         Button(action: action) {
             Image(systemName: "xmark")
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(Ink.text)
+                .foregroundStyle(ground == .sheet ? Ink.text : Ink.onSignal)
                 .frame(width: 50, height: 50)
         }
-        .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
+        .buttonStyle(
+            ground == .sheet
+                ? StickerCircleStyle(fill: Ink.groundRaised)
+                : StickerCircleStyle(fill: Ink.text, outline: Ink.text)
+        )
         .hitTarget()
         .accessibilityLabel("Close")
     }

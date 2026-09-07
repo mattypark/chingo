@@ -122,7 +122,7 @@ struct NearbyRail: View {
     /// a real person.
     private var caption: some View {
         VStack(alignment: .trailing, spacing: 2) {
-            Text("about \(listed[clampedFocus].approxMetres) m away")
+            Text(Distance.away(metres: listed[clampedFocus].approxMetres))
                 .font(.chinFootnote)
                 .foregroundStyle(Ink.textSoft)
             Text(people.count == 1 ? "1 person near you" : "\(people.count) people near you")

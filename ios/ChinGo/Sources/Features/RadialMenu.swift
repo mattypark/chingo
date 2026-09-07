@@ -85,18 +85,26 @@ struct RadialMenu: View {
                     // Drawn first so the buttons sit on top of where the lines end.
                     Connectors(
                         centre: point(Self.centreSlot, in: geo.size),
-                        satellites: placed.dropFirst().map { point($0.slot, in: geo.size) }
+                        satellites: placed.dropFirst().map { point($0.slot, in: geo.size) },
+                        centreRadius: Self.primaryDiameter / 2,
+                        satelliteRadius: Self.satelliteDiameter / 2
                     )
                     .opacity(open ? 1 : 0)
                     .animation(Motion.arrive.delay(0.08), value: open)
 
                     ForEach(Array(placed.enumerated()), id: \.element.option.id) { index, entry in
-                        button(entry.option, index: index)
-                            .position(point(entry.slot, in: geo.size))
+                        button(
+                            entry.option,
+                            index: index,
+                            // Above the circle for anything sitting above the middle, so the
+                            // caption is never in the path the connector takes.
+                            labelAbove: entry.slot.y < Self.centreSlot.y
+                        )
+                        .position(point(entry.slot, in: geo.size))
                     }
                 }
 
-                CloseButton { close() }
+                CloseButton(on: .field) { close() }
                     .opacity(open ? 1 : 0)
                     .padding(.bottom, Space.section)
             }
@@ -104,28 +112,46 @@ struct RadialMenu: View {
         .onAppear { withAnimation(Motion.arrive) { open = true } }
     }
 
+    /// One source for the circle sizes. They used to live only inside `button`, so the
+    /// connectors had to guess them -- and guessed wrong.
+    static let primaryDiameter: CGFloat = 74
+    static let satelliteDiameter: CGFloat = 58
+
     private func point(_ slot: UnitPoint, in size: CGSize) -> CGPoint {
         CGPoint(x: size.width * slot.x, y: size.height * slot.y)
     }
 
-    private func button(_ option: RadialOption, index: Int) -> some View {
-        let size: CGFloat = option.isPrimary ? 74 : 58
+    /// `labelAbove` puts the caption on the far side of the circle from the centre.
+    ///
+    /// A satellite sitting above the middle has its connector arriving from below, and a
+    /// caption pinned under the circle is then sitting exactly where the line comes in. The
+    /// old code hid that by stopping the line 37 points short, which fixed the overlap by
+    /// disconnecting the drawing. Moving the caption is the fix; the line can then land on
+    /// the circle where it belongs.
+    private func button(_ option: RadialOption, index: Int, labelAbove: Bool) -> some View {
+        let size: CGFloat = option.isPrimary ? Self.primaryDiameter : Self.satelliteDiameter
 
         return VStack(spacing: Space.snug) {
+            if labelAbove { MenuLabel(option.label) }
             Button {
                 close(then: option.action)
             } label: {
                 Image(systemName: option.icon)
                     .font(.system(size: option.isPrimary ? 28 : 21, weight: .bold))
-                    .foregroundStyle(option.isPrimary ? accent.onSignal : Ink.text)
+                    // Both circles are ink now, so size and glyph do the separating: the
+                    // primary carries the accent, the others carry cream.
+                    .foregroundStyle(option.isPrimary ? accent.signalLift : Ink.onSignal)
                     .frame(width: size, height: size)
             }
             // Opaque, outlined, hard-shadowed. The translucent-fill-with-hairline version
             // this replaces was the single most Pokemon-GO-looking thing in the app.
-            .buttonStyle(StickerCircleStyle(fill: option.isPrimary ? accent.signal : Ink.ground))
+            //
+            // Ink on both, because the field behind them is the accent now -- an accent
+            // button on an accent field is a button you cannot see.
+            .buttonStyle(StickerCircleStyle(fill: Ink.text, outline: Ink.text))
             .hitTarget()
 
-            MenuLabel(option.label)
+            if !labelAbove { MenuLabel(option.label) }
         }
         .opacity(open ? 1 : 0)
         .scaleEffect(open ? 1 : 0.5)
@@ -149,6 +175,8 @@ struct RadialMenu: View {
 /// middle of; this one is a list of things you might go and do, and a list should read as a
 /// list. Right-aligned because it opens from the bottom-right button and belongs to it.
 struct ListMenu: View {
+    @Environment(\.accent) private var accent
+
     let options: [RadialOption]
     var onClose: () -> Void
 
@@ -176,7 +204,7 @@ struct ListMenu: View {
                 // Under the rows, not centred on the screen. This menu opens from the
                 // bottom-right button and the thumb that opened it is already over there;
                 // sending it back to the middle to close is a trip for nothing.
-                CloseButton { close() }
+                CloseButton(on: .field) { close() }
                     .opacity(open ? 1 : 0)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -193,12 +221,12 @@ struct ListMenu: View {
             HStack(spacing: Space.snug) {
                 Image(systemName: option.icon)
                     .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(Ink.text)
+                    .foregroundStyle(accent.signalLift)
                     .frame(width: 26)
 
                 Text(option.label)
                     .font(.custom(Typeface.bagel, size: 19))
-                    .foregroundStyle(Ink.text)
+                    .foregroundStyle(Ink.onSignal)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -207,7 +235,11 @@ struct ListMenu: View {
         }
         // Bagel on a solid pill, not thin caps floating on a gradient. The label is the
         // button now, which is what a heavy typeface wants to be.
-        .buttonStyle(StickerButtonStyle(fill: Ink.ground, radius: Radius.surface))
+        //
+        // Ink rather than cream. A cream pill on a cream map is a card; a cream pill on a
+        // full-bleed colour field is a hole punched in it. Ink reads as an object laid on
+        // the colour, which is what it is.
+        .buttonStyle(StickerButtonStyle(fill: Ink.text, outline: Ink.text, radius: Radius.surface))
         .hitTarget()
         .opacity(open ? 1 : 0)
         // Rows arrive from the right, the side they belong to.
@@ -238,6 +270,13 @@ private struct Connectors: View {
     let centre: CGPoint
     let satellites: [CGPoint]
 
+    /// The circles the line has to meet, so the gap can be measured from the edge rather
+    /// than guessed from the middle. The old numbers were guessed, and were 37 points short
+    /// of a 58pt satellite -- which is why the line read as a squiggle floating between two
+    /// buttons instead of joining them.
+    let centreRadius: CGFloat
+    let satelliteRadius: CGFloat
+
     var body: some View {
         ZStack {
             ForEach(Array(satellites.enumerated()), id: \.offset) { _, target in
@@ -265,15 +304,17 @@ private struct Connectors: View {
     /// instead of bending whichever way the geometry happens to fall.
     private func curve(from: CGPoint, to: CGPoint) -> Path {
         var path = Path()
-        // The centre end clears its own circle; the satellite end has to clear its circle
-        // *and* the label underneath it, or the line runs straight through the caption.
-        let start = inset(from: from, towards: to, by: 46)
-        let end = inset(from: to, towards: from, by: 66)
+        // Four points off each circle's edge: close enough to read as joined, far enough
+        // that the stroke's round cap does not bite into the outline.
+        let start = inset(from: from, towards: to, by: centreRadius + 4)
+        let end = inset(from: to, towards: from, by: satelliteRadius + 4)
         let span = abs(start.x - end.x)
+        // The bow has to be big enough to carry the line clear of the label sitting under
+        // the satellite. On a straight vertical run there is no span to bow from, so it
+        // takes a fixed sideways kick -- and that kick is what routes it around the caption
+        // rather than through it.
         let control = CGPoint(
-            // A straight vertical run has no horizontal span to bow from, so it gets a fixed
-            // sideways kick instead of collapsing into a plain line.
-            x: (start.x + end.x) / 2 + (span < 24 ? 26 : 0),
+            x: (start.x + end.x) / 2 + (span < 24 ? 52 : 0),
             y: min(start.y, end.y) - max(span * 0.22, 18)
         )
         path.move(to: start)
@@ -291,6 +332,6 @@ private struct Connectors: View {
     }
 
     private func blobPoint(from: CGPoint, to: CGPoint) -> CGPoint {
-        inset(from: to, towards: from, by: 66)
+        inset(from: to, towards: from, by: satelliteRadius + 4)
     }
 }

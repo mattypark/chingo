@@ -2,14 +2,21 @@ import SwiftUI
 
 /// What a menu opens onto.
 ///
-/// Not a dim over the map. When a menu takes the screen it takes it properly — a deep berry
-/// field in the mascot's own colours, so the moment reads as stepping inside the app rather
-/// than as a panel laid on top of it. The map is still there when you close it; it does not
-/// need to be watched while you choose.
+/// Not a dim over the map. When a menu takes the screen it takes it properly, so the moment
+/// reads as stepping inside the app rather than as a panel laid on top of it. The map is
+/// still there when you close it; it does not need to be watched while you choose.
 ///
-/// The gradient runs dark at the top to light at the bottom, which puts the lightest ground
+/// **It is the player's colour, not the mascot's.** This was a berry field, on the argument
+/// that a full-screen takeover should be unmistakably the bear's. That argument loses to a
+/// simpler one: the accent is the only colour in the app the player chose, and the biggest
+/// surface it could possibly appear on was showing somebody else's purple instead. Berry is
+/// still the mascot's, and still on his own face and banner.
+///
+/// The gradient runs deep at the top to light at the bottom, which puts the lightest ground
 /// under the controls, where the contrast is needed.
 public struct MenuBackdrop: View {
+    @Environment(\.accent) private var accent
+
     private let onTap: () -> Void
 
     public init(onTap: @escaping () -> Void) {
@@ -18,7 +25,7 @@ public struct MenuBackdrop: View {
 
     public var body: some View {
         LinearGradient(
-            colors: [Ink.berryDeep, Ink.berry, Ink.berryLift],
+            colors: [accent.signalDeep, accent.signal, accent.signalLift],
             startPoint: .top,
             endPoint: .bottom
         )
