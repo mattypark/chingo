@@ -34,7 +34,7 @@ Each of these is a named tell. None of them ship.
 | Colour | `Palette.swift` → `Ink` | Never a literal. The map's colours live here too, so the basemap and the chrome above it stay one product. |
 | The accent | `Accent.swift` → `@Environment(\.accent)` | The one colour the app does not choose. Eight measured hues, picked in onboarding, stored as an index on `MeRecord.bannerTint`. Read from the environment, never from `Ink` — a `static let` cannot change and cannot tell SwiftUI that it did. |
 | Sky | `Sky.swift` | Solar altitude from a coordinate, offline. A palette keyed on the angle, never on the clock. |
-| Type | `Typography.swift` | Bagel Fat One for numbers and two-word shouts, never a sentence. SF Pro for anything read. Gloria only when a person is speaking. |
+| Type | `Typography.swift` | Bagel Fat One for numbers and two-word shouts, never a sentence. SF Pro for anything read. Gloria when a person is speaking — and for the nearby rail; see below. |
 | Spacing | `Tokens.swift` → `Space` | 8pt grid, 4pt subdivisions. `hair` 4 · `tight` 8 · `snug` 12 · `step` 16 · `inset` 20 · `margin` 24 · `section` 32 |
 | Radius | `Tokens.swift` → `Radius` | Three tiers: `control` 12 · `card` 20 · `surface` 28 |
 | Elevation | `Sticker.swift` → `Sticker.drop` | Hard, zero blur, one offset. `Tokens.swift` → `Elevation` still holds the four soft recipes, but nothing on the map screen uses them any more — see below. |
@@ -53,6 +53,14 @@ and it was not true here: the map's chrome was the last place still using soft b
 elevation while every sheet and card had moved to `Sticker`, and two languages on one screen
 reads worse than either does alone. The top pills, the catch button, the player puck and the
 memory polaroids all take the 3pt outline and the hard drop now.
+
+**Gloria is allowed one list.** The rule was that Gloria is a person speaking and never a
+control label, and the nearby rail down the right edge now breaks it on Matthew's call. The
+reasoning that won: the rail is not a control, it is the app naming the people standing around
+you, and a handwritten list of names reads as the bear telling you who is out. It was Bagel
+before, which was worse in both directions — a display face doing something you read, and the
+one place in the app where names were shouted. Nothing else gets Gloria; the moment a second
+list asks for it, this exception is what should be re-argued rather than extended.
 
 **The three corner controls became one bar.** Three controls pinned to three corners with the
 width of the screen between them did not read as a set. `HomeBar` docks them, and the catch

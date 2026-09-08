@@ -11,13 +11,19 @@ import ChinGoDesign
 /// is heavy and large over a 3pt accent rule; its neighbours step down in weight. Nothing
 /// fades, nothing blurs, and the list still has an obvious middle.
 ///
-/// **SF Pro, not Bagel.** The names were set in Bagel from the day this was written, and it
-/// was wrong for the reason `DESIGN.md` already gives: Bagel is for numbers and two-word
-/// shouts, and anything you actually read is SF Pro. A column of names is read. At display
-/// weight over a park, with a hard cream offset behind each one to hold it off the green, the
-/// letterforms doubled and the whole rail looked embossed rather than printed -- so the shadow
-/// went with it. Weight holds the names off the park on its own; a plate behind them would be
-/// a translucent fill, which this language does not have.
+/// **Gloria Hallelujah, and that overrules a rule.** `DESIGN.md` says Gloria is a person
+/// speaking and never a control label. Matthew's call is that these names are exactly that --
+/// a handwritten list of who is out there, in the app's own hand, rather than a system control
+/// -- and the contract has been amended to say so instead of quietly broken.
+///
+/// The names were Bagel from the day this was written, which was wrong for the opposite
+/// reason: Bagel is for numbers and two-word shouts, and at display weight over a park, with a
+/// hard cream offset behind each one, the letterforms doubled and the rail looked embossed.
+///
+/// Gloria has no weight axis, so the focus ramp is carried entirely by size, and it is set
+/// larger than either predecessor -- a handwriting face at 16 points over grass is a scribble.
+/// Nothing sits behind the names: a plate would be a translucent fill, which this language
+/// does not have.
 ///
 /// It exists because the map never said a single person was near you -- on an app whose whole
 /// premise is collecting the people you meet.
@@ -73,12 +79,14 @@ struct NearbyRail: View {
     /// scrubbed one name. Same structure, opposite mechanic, because the data is not the same
     /// shape. What carries the choice is the size ramp and the rule, not the position.
     private var rail: some View {
-        VStack(alignment: .trailing, spacing: Space.hair) {
+        // `tight` rather than `hair`. Gloria slants and its descenders hang further than an
+        // upright face's, so at 4pt the tail of one name touches the top of the next.
+        VStack(alignment: .trailing, spacing: Space.tight) {
             ForEach(Array(listed.enumerated()), id: \.element.id) { index, person in
                 let distance = abs(index - clampedFocus)
 
                 Text(person.handle)
-                    .font(.system(size: size(at: distance), weight: weight(at: distance), design: .rounded))
+                    .font(.custom(Typeface.gloria, size: size(at: distance)))
                     .foregroundStyle(colour(at: distance))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -105,22 +113,16 @@ struct NearbyRail: View {
     /// Three sizes, chosen rather than interpolated: a continuous ramp would put every row at
     /// its own arbitrary size, which is the uniformity the token sets exist to prevent, one
     /// step removed.
+    ///
+    /// Bigger than the sizes either earlier face used, because Gloria has a small x-height for
+    /// its point size and only one weight -- so size is the only thing left to carry focus,
+    /// and the whole ramp has to sit above the point where a handwriting face over grass stops
+    /// being legible.
     private func size(at distance: Int) -> CGFloat {
         switch distance {
-        case 0: 24
-        case 1: 18
-        default: 16
-        }
-    }
-
-    /// Weight does most of the work now that the face is SF Pro. Bagel had one weight, so the
-    /// old ramp had to buy its hierarchy entirely with size, and the gap between 26 and 15 was
-    /// wide enough that the ends of the list read as a different control from the middle.
-    private func weight(at distance: Int) -> Font.Weight {
-        switch distance {
-        case 0: .heavy
-        case 1: .semibold
-        default: .medium
+        case 0: 27
+        case 1: 21
+        default: 18
         }
     }
 

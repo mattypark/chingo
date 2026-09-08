@@ -46,9 +46,14 @@ public extension Font {
     /// Tracked-out uppercase metadata. Smallest text the app is allowed to set.
     static let chinLabel = Font.system(.caption, design: .rounded, weight: .semibold)
 
-    // MARK: Human voice — Gloria. A friend talking, never interface chrome.
+    // MARK: Human voice — Gloria. A friend talking, and one list of names.
 
-    /// The move a friend wrote on your card. A memory's caption. Never a control label.
+    /// The move a friend wrote on your card. A memory's caption.
+    ///
+    /// Not a control label — with one amendment recorded in `DESIGN.md`: the nearby rail sets
+    /// its names in Gloria, because a handwritten column of who is standing around you is the
+    /// app naming people rather than an interface labelling a control. `NearbyRail` sets the
+    /// face directly rather than taking this style, since its sizes ramp with focus.
     static let chinHand = Font.custom(Typeface.gloria, size: 16, relativeTo: .callout)
 }
 
