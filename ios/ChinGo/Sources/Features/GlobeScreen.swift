@@ -24,8 +24,9 @@ struct GlobeScreen: View {
     @State private var selected: GlobePin?
     @State private var fitToken = 0
     @State private var projection = GlobeProjection()
-    @AppStorage("globeLook") private var look: GlobeLook = .globe
+    @AppStorage("globeLook") private var look: GlobeLook = GlobeLook.fallback
     @State private var pickingLook = false
+    @Environment(\.dismiss) private var dismiss
     /// Who the camera is looking at, and a counter so tapping the same person twice flies
     /// back to them rather than doing nothing.
     @State private var focus: GlobePin?
@@ -67,36 +68,36 @@ struct GlobeScreen: View {
     }
 
     var body: some View {
-        SheetShell {
-            ZStack(alignment: .top) {
-                if globeEnabled {
-                    GlobeMap(
-                        pins: pins,
-                        fitToken: fitToken,
-                        projection: projection,
-                        look: look,
-                        focus: focus,
-                        focusToken: focusToken
-                    )
-                    .ignoresSafeArea(edges: .horizontal)
-                    .overlay { tokens }
-                    .overlay(alignment: .bottom) { faces }
+        ZStack {
+            if globeEnabled {
+                GlobeMap(
+                    pins: pins,
+                    fitToken: fitToken,
+                    projection: projection,
+                    look: look,
+                    focus: focus,
+                    focusToken: focusToken
+                )
+                .overlay { tokens }
 
-                    if pins.isEmpty { nobodyYet }
-                } else {
-                    invitation
-                }
+                if pins.isEmpty { nobodyYet }
+            } else {
+                Ink.ground
+                invitation
+            }
 
-                VStack(alignment: .leading, spacing: Space.tight) {
-                    header
-                    if pickingLook {
-                        GlobeLookBar(selection: $look)
-                            .padding(.horizontal, Space.margin)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                }
+            // The chrome floats on the map rather than being framed by a sheet.
+            //
+            // This used to sit inside `SheetShell`, which put a band of cream above and below
+            // it and a close button on its own row -- so the screen read as a picture of a map
+            // inside the app rather than as the map. A map with a margin is a diagram.
+            VStack(spacing: 0) {
+                topBar
+                Spacer(minLength: 0)
+                bottomBar
             }
         }
+        .ignoresSafeArea()
         .sheet(item: $selected) { pin in
             GlobePinCard(pin: pin)
                 .presentationDetents([.height(230)])
@@ -183,35 +184,36 @@ struct GlobeScreen: View {
                 .compositingGroup()
                 .shadow(color: Ink.text, radius: 0, x: Sticker.drop, y: Sticker.drop)
                 .padding(.horizontal, Space.margin)
-                // Clear of Apple's attribution, which is not optional -- the maps legal
-                // notice has to stay visible and unobstructed.
-                .padding(.bottom, Space.section + Space.step)
             }
         }
     }
 
-    private var header: some View {
-        HStack(spacing: Space.tight) {
-            // The title is gone and the layer picker has its place. On a screen that is
-            // entirely one map, a word naming the screen is the least useful thing that could
-            // occupy the corner -- you know where you are, and what you might want is to
-            // change what you are looking at.
-            Button { withAnimation(Motion.surface) { pickingLook.toggle() } } label: {
-                Image(systemName: pickingLook ? "xmark" : "square.3.layers.3d")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Ink.text)
-                    .frame(width: 40, height: 40)
-            }
-            .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
-            .hitTarget()
-            .accessibilityLabel("Change how the map looks")
+    /// Layers on the left, and the two things that are about *you* on the right -- the way
+    /// Bump puts your own face and your alerts in that corner.
+    private var topBar: some View {
+        HStack(alignment: .top, spacing: Space.tight) {
+            VStack(alignment: .leading, spacing: Space.tight) {
+                Button { withAnimation(Motion.surface) { pickingLook.toggle() } } label: {
+                    Image(systemName: pickingLook ? "xmark" : "square.3.layers.3d")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Ink.text)
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
+                .hitTarget()
+                .accessibilityLabel("Change how the map looks")
 
-            Spacer()
+                if pickingLook {
+                    GlobeLookBar(selection: $look)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+
+            Spacer(minLength: 0)
 
             if globeEnabled {
-                // Pause is the loudest control on the screen after the title, on purpose. The
-                // way out of a location feature should never be the hardest thing to find in
-                // it.
+                // Pause stays the loudest control up here. The way out of a location feature
+                // should never be the hardest thing to find in it.
                 Button {
                     guard let identity else { return }
                     identity.sharingPaused.toggle()
@@ -221,31 +223,68 @@ struct GlobeScreen: View {
                         .font(.custom(Typeface.bagel, size: 14))
                         .foregroundStyle(paused ? accent.onSignal : Ink.text)
                         .padding(.horizontal, Space.snug)
-                        .padding(.vertical, Space.hair + 2)
+                        .padding(.vertical, Space.tight)
                 }
                 .buttonStyle(
                     StickerButtonStyle(
                         fill: paused ? accent.signal : Ink.groundRaised,
-                        radius: Radius.control
+                        radius: Radius.pill
                     )
                 )
                 .hitTarget()
 
-                Button {
-                    managing = true
-                } label: {
-                    Image(systemName: "person.2.badge.gearshape.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Ink.text)
-                        .padding(Space.tight)
-                }
-                .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
-                .hitTarget()
-                .accessibilityLabel("Who can see you")
+                PortraitWell(portraitFile: identity?.portraitFile, diameter: 40)
             }
         }
         .padding(.horizontal, Space.margin)
-        .padding(.top, Space.snug)
+        .padding(.top, Space.section + Space.step)
+    }
+
+    /// Three round buttons along the bottom, which is where Bump puts the map's own verbs.
+    ///
+    /// The right-hand one is the way out, and it is deliberately in the same corner as the
+    /// globe button that opened this screen. A door you leave by the handle you came in
+    /// through does not need a label.
+    private var bottomBar: some View {
+        VStack(spacing: Space.snug) {
+            if globeEnabled, pins.count > 1 { faces }
+
+            HStack(alignment: .bottom, spacing: Space.section) {
+                if globeEnabled {
+                    roundButton(icon: "person.2.badge.gearshape.fill", label: "Sharing") {
+                        managing = true
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                roundButton(icon: "map.fill", label: "Map") { dismiss() }
+            }
+            .padding(.horizontal, Space.margin)
+            .padding(.bottom, Space.section + Space.margin)
+        }
+    }
+
+    private func roundButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        VStack(spacing: Space.hair) {
+            Button(action: action) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(Ink.text)
+                    .frame(width: 52, height: 52)
+            }
+            .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
+            .hitTarget()
+
+            Text(label)
+                .font(.custom(Typeface.bagel, size: 11))
+                .foregroundStyle(Ink.text)
+                // The label sits on the map, so it gets the same hard cream offset every other
+                // piece of type over live ground in this app gets.
+                .shadow(color: Ink.groundRaised, radius: 0, x: 1.5, y: 1.5)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
     }
 
     /// The globe is on and nobody is on it. Says what to do, not what went wrong.

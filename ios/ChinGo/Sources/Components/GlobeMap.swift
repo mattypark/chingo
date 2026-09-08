@@ -72,6 +72,11 @@ struct GlobeMap: UIViewRepresentable {
         map.showsScale = false
         map.isPitchEnabled = false
         map.pointOfInterestFilter = .excludingAll
+        // Push Apple's legal attribution clear of our own bottom bar. It is not decoration
+        // and it is not optional -- the maps terms require it visible and unobstructed -- and
+        // `layoutMargins` is the supported way to tell MapKit where the chrome is rather than
+        // drawing over it and hoping.
+        map.layoutMargins = UIEdgeInsets(top: 0, left: 0, bottom: 132, right: 0)
         map.camera = MKMapCamera(
             lookingAtCenter: CLLocationCoordinate2D(latitude: 20, longitude: -30),
             fromDistance: Self.globeAltitude,

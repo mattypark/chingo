@@ -15,6 +15,12 @@ enum GlobeLook: String, CaseIterable, Identifiable {
     /// Photographic, and an actual sphere on a starfield.
     case globe
 
+    /// Drawn, not photographed. Satellite imagery is somebody else's aesthetic dropped into
+    /// the middle of an app made of flat colour and hard outlines, and at the zoom people
+    /// actually use this at -- their own city -- it is also just harder to read. The sphere
+    /// is still one tap away for when the question is "where in the world".
+    static let fallback: GlobeLook = .map
+
     var id: String { rawValue }
 
     var title: String {
