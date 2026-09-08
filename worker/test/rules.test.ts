@@ -31,7 +31,11 @@ describe("cells", () => {
   });
 
   it("throws away precision", () => {
-    expect(cellId(37.7596, -122.4270)).toBe(cellId(37.7590, -122.4265));
+    // 37.7596 / 0.00135 = 27970.07 and 37.7598 / 0.00135 = 27970.2: same cell. The obvious
+    // "a few metres south" point, 37.7590, is 27969.6 -- across the boundary. Cells are
+    // grid squares, not circles around you.
+    expect(cellId(37.7596, -122.4270)).toBe(cellId(37.7598, -122.4266));
+    expect(cellId(37.7596, -122.4270)).not.toBe(cellId(37.7590, -122.4270));
     expect(cellId(37.7596, -122.4270)).not.toBe(cellId(37.7700, -122.4270));
   });
 

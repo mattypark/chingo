@@ -62,7 +62,7 @@ async function importKey(header: { alg: string; kid?: string }, env: Env): Promi
   throw new Error(`unsupported alg ${header.alg}`);
 }
 
-function algorithm(alg: string): AlgorithmIdentifier | EcdsaParams {
+function algorithm(alg: string): Parameters<SubtleCrypto["verify"]>[0] {
   if (alg === "HS256") return { name: "HMAC" };
   if (alg === "ES256") return { name: "ECDSA", hash: "SHA-256" };
   return { name: "RSASSA-PKCS1-v1_5" };
@@ -70,9 +70,8 @@ function algorithm(alg: string): AlgorithmIdentifier | EcdsaParams {
 
 /** Throws on anything short of a valid, unexpired, authenticated-role token. */
 export async function verifySupabaseJwt(token: string, env: Env): Promise<Verified> {
-  const parts = token.split(".");
-  if (parts.length !== 3) throw new Error("malformed");
-  const [h, p, s] = parts;
+  const [h, p, s] = token.split(".");
+  if (!h || !p || !s) throw new Error("malformed");
   const header = decodeJson<{ alg: string; kid?: string; typ?: string }>(h);
   const payload = decodeJson<{ sub?: string; exp?: number; aud?: string | string[]; role?: string }>(p);
 
