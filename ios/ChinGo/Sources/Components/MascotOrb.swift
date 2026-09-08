@@ -30,6 +30,14 @@ import ChinGoDesign
 /// **It looks at things.** When something is near, it leans toward *that* thing's direction
 /// rather than playing a stock excited clip. Direction-specific reaction reads as noticing
 /// you; a generic clip reads as decoration.
+/// Squash, stretch and lean, animated together so the volume looks preserved -- as one axis
+/// grows the other has to give, or the bear reads as a balloon rather than as something soft.
+private struct Squish: Equatable {
+    var width: Double = 1
+    var height: Double = 1
+    var tilt: Double = 0
+}
+
 struct MascotOrb: View {
     @Environment(\.accent) private var accent
 
@@ -44,8 +52,10 @@ struct MascotOrb: View {
     @State private var beat = false
     /// True while a finger is held on it.
     @State private var hugging = false
-    /// Bumped per hug, to hang the haptic on.
+    /// Bumped per hug, to hang the haptic and the pop on.
     @State private var hugs = 0
+    /// Cancelled if the finger lifts before the press becomes a press.
+    @State private var holdTask: Task<Void, Never>?
 
     /// The idle set. Small, quiet, and deliberately more than a handful.
     ///
@@ -125,35 +135,71 @@ struct MascotOrb: View {
                 // orb this small stops reading as "looking over there" and starts reading
                 // as broken layout.
                 .rotationEffect(.degrees(glanceTilt), anchor: .bottom)
-                // The hug. Held down, the bear leans further out of the disc, grows, and
-                // comes down toward the thumb that is holding it.
+                // The hug, in two parts.
                 //
-                // Honest about what this is: one front-facing sprite cannot actually wrap
-                // around a finger, so this is a lean and a reach rather than a real hug pose.
-                // Doing it properly needs a second drawing, and a squashed front view
-                // pretending to be arms would look worse than not trying.
-                .scaleEffect(hugging ? 1.22 : 1, anchor: .bottom)
-                .rotationEffect(.degrees(hugging ? -13 : 0), anchor: .bottom)
-                .offset(y: hugging ? diameter * 0.10 : 0)
-                .animation(.spring(response: 0.28, dampingFraction: 0.55), value: hugging)
+                // The held part: while the finger stays down the bear leans further out of
+                // the disc and reaches toward it. A spring, not a ramp, so letting go throws
+                // it back rather than sliding it back.
+                .scaleEffect(hugging ? 1.16 : 1, anchor: .bottom)
+                .rotationEffect(.degrees(hugging ? -14 : 0), anchor: .bottom)
+                .offset(y: hugging ? diameter * 0.08 : 0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.5), value: hugging)
+                // The pop: a squash, an overshoot and a wobble, fired once per hug.
+                //
+                // This is the part that stops it reading as a sliding image. Squash and
+                // stretch is the oldest trick there is and it is the whole difference between
+                // a drawn thing that is alive and a PNG being moved -- a character that
+                // changes size without changing shape reads as a decal, because nothing soft
+                // moves that way. It has to anticipate downward before it goes up, or the
+                // rise has nothing to come out of.
+                .keyframeAnimator(initialValue: Squish(), trigger: hugs) { view, squish in
+                    view
+                        .scaleEffect(x: squish.width, y: squish.height, anchor: .bottom)
+                        .rotationEffect(.degrees(squish.tilt), anchor: .bottom)
+                } keyframes: { _ in
+                    KeyframeTrack(\.height) {
+                        SpringKeyframe(0.86, duration: 0.10, spring: .snappy)   // anticipate
+                        SpringKeyframe(1.14, duration: 0.16, spring: .bouncy)   // spring up
+                        SpringKeyframe(1.0, duration: 0.34, spring: .bouncy)    // settle
+                    }
+                    KeyframeTrack(\.width) {
+                        SpringKeyframe(1.16, duration: 0.10, spring: .snappy)   // widen as it squashes
+                        SpringKeyframe(0.92, duration: 0.16, spring: .bouncy)
+                        SpringKeyframe(1.0, duration: 0.34, spring: .bouncy)
+                    }
+                    KeyframeTrack(\.tilt) {
+                        LinearKeyframe(0, duration: 0.10)
+                        SpringKeyframe(-9, duration: 0.14, spring: .bouncy)
+                        SpringKeyframe(4, duration: 0.16, spring: .bouncy)
+                        SpringKeyframe(0, duration: 0.24, spring: .bouncy)
+                    }
+                }
         }
         // Deliberately not clipped and deliberately taller than it is wide. The bear stands
         // above the disc now, so clipping to the circle would cut its head off -- which is
         // exactly what the old `clipShape` on the image was doing by design.
         .frame(width: diameter, height: diameter, alignment: .center)
         .animation(Motion.surface, value: glanceTilt)
-        // Simultaneous, so the tap that opens the profile still works. A long press that
-        // stole the gesture would mean the bear could be hugged or tapped but not both, and
-        // the tap is the one that does something.
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    guard !hugging else { return }
+        // Long press only. Anything that reacts on touch-down eats the tap that opens the
+        // profile -- which is what the first version did, so the bear animated and the
+        // profile never opened.
+        .onLongPressGesture(minimumDuration: 0.26, maximumDistance: 30) {
+            hugs += 1
+        } onPressingChanged: { pressing in
+            // The lean is held only while the finger is down, and only after the press has
+            // lasted long enough to be a press. `pressing` goes true immediately, so the
+            // delay is explicit rather than implied.
+            if pressing {
+                holdTask = Task {
+                    try? await Task.sleep(for: .milliseconds(260))
+                    guard !Task.isCancelled else { return }
                     hugging = true
-                    hugs += 1
                 }
-                .onEnded { _ in hugging = false }
-        )
+            } else {
+                holdTask?.cancel()
+                hugging = false
+            }
+        }
         .feedback(.pick, on: hugs)
         .task { await liveIdly() }
         .accessibilityHidden(true)   // HomeBar labels the whole cell

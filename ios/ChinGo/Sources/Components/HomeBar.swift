@@ -80,9 +80,16 @@ struct HomeBar: View {
 
     /// Bottom-left is you. On a map screen that is the one position people learn without
     /// being told.
+    /// Tap opens the profile; press and hold hugs the bear.
+    ///
+    /// Not a `Button`, and that is the fix rather than a preference. The hug used to be a
+    /// simultaneous gesture on the button's own label, and a gesture attached to a label
+    /// swallows the button's tap -- so the bear animated and the profile never opened, which
+    /// is exactly what it looked like. A plain view with an explicit tap gesture and an
+    /// explicit long press lets the two coexist, because the long press does not begin until
+    /// well after a tap would have ended.
     private var meCell: some View {
-        Button(action: onProfile) {
-            HStack(spacing: Space.tight) {
+        HStack(spacing: Space.tight) {
                 MascotOrb(
                     level: level,
                     progress: progress,
@@ -97,10 +104,10 @@ struct HomeBar: View {
                     .foregroundStyle(accent.signal)
                     .contentTransition(.numericText())
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(SquashButtonStyle())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onProfile)
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel("You, level \(level)")
     }
 

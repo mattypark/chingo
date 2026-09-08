@@ -601,23 +601,29 @@ struct MapScreen: View {
             onDeck: { withAnimation(Motion.arrive) { deckMenu = true } }
         )
         .overlay(alignment: .topTrailing) {
-            // The compass cannot be a fourth cell: it only exists once you have turned the
-            // view, and a cell that appears and disappears breaks the bar into two different
-            // shapes. So it floats above the end of the bar, next to the thing it undoes.
-            if !camera.isFollowingCourse {
-                Button { camera.recenter(course: location.course) } label: {
-                    Image(systemName: "location.north.line.fill")
-                        .font(.system(size: 16, weight: .bold))
+            // Neither of these can be a fourth cell in the bar. The compass only exists once
+            // you have turned the view, and a cell that appears and disappears breaks the bar
+            // into two different shapes; the globe is a place you go rather than a thing you
+            // do here. So they stack above the end of the bar instead.
+            VStack(spacing: Space.tight) {
+                Button { showGlobe = true } label: {
+                    Image(systemName: "globe")
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(accent.signal)
-                        .rotationEffect(.degrees(-camera.bearing))
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
                 .hitTarget()
-                .accessibilityLabel("Face the way you are walking")
-                .transition(.scale.combined(with: .opacity))
-                .offset(y: -Space.section)
+                .accessibilityLabel("See where your friends are")
+
+                if !camera.isFollowingCourse {
+                    CompassRose(bearing: camera.bearing) {
+                        camera.recenter(course: location.course)
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
             }
+            .offset(y: -Space.section)
         }
         .animation(Motion.surface, value: camera.isFollowingCourse)
     }
