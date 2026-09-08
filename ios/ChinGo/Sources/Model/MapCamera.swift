@@ -26,15 +26,18 @@ final class MapCamera {
     /// you can see six blocks, which is a navigation app's answer -- it tells you where you
     /// are in the city. This screen wants the opposite: the street you are standing on.
     ///
-    /// The engine's ceiling, and it turns out to be the right one.
+    /// As far in as the screen can go and still show what the screen is for.
     ///
-    /// Going further in was tried at 20.4 and looks broken without being broken: at that zoom
-    /// you can see about forty metres of ground, and on a downtown block that is entirely
-    /// block interior. The whole screen goes flat green and the roads are off the edge, which
-    /// reads as the map having lost its streets. The street grid is the thing that makes this
-    /// look like a game map rather than a lawn, so the useful limit is the zoom where you can
-    /// still see the street you are on and the next one over.
-    private(set) var zoom: Double = 19
+    /// Two things set this, and they agree. Going further in was tried at 20.4 and looks
+    /// broken without being broken: you see about forty metres of ground, which on a downtown
+    /// block is entirely block interior, so the whole screen goes flat green and the roads are
+    /// off the edge. And the radar rings are 80 and 150 metres across -- at 19 the inner one
+    /// is already wider than the screen, so the boundary you are meant to judge distance by
+    /// cannot be seen at all.
+    ///
+    /// The street grid and the rings are the two things that make this read as a game map
+    /// rather than a lawn, and 18.2 is the closest in where both survive.
+    private(set) var zoom: Double = 18.2
 
     /// True while the camera follows the direction of travel. A drag hands control to the
     /// user and it stays handed over until they explicitly ask for it back — a camera that

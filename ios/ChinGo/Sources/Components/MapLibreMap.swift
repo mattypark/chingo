@@ -37,6 +37,9 @@ struct MapLibreMap: UIViewRepresentable {
     /// Everyone with a bear on the map, nearest last so the draw order is already right.
     var bears: [BearMark] = []
 
+    /// The two ground rings, or nil before a position is known.
+    var radar: RadarState?
+
     func makeUIView(context: Context) -> MLNMapView {
         // Not the bundled file directly: MapStyle corrects the palette the generated style
         // drifted from and washes the neutral family toward the player's accent.
@@ -116,10 +119,55 @@ struct MapLibreMap: UIViewRepresentable {
         /// The source the bear layers read. Held so `updateUIView` can push new positions
         /// without rebuilding the layers.
         var bearSource: MLNShapeSource?
+        var radarSource: MLNShapeSource?
+        /// The rings' own layers, kept so the hidden state can restyle them without a reload.
+        var radarLines: [MLNLineStyleLayer] = []
 
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
+            installRadarLayers(into: style)
             installBearLayers(into: style)
             if let aim { mapView.setCamera(aim(mapView), animated: false) }
+        }
+
+        /// The two rings, as real geometry in real coordinates.
+        ///
+        /// Inserted *below* the first label layer so street names stay readable over them --
+        /// a ring painted over its own street is a ring you cannot navigate by.
+        func installRadarLayers(into style: MLNStyle) {
+            let source = MLNShapeSource(identifier: "radar", shape: nil, options: nil)
+            style.addSource(source)
+            radarSource = source
+
+            // Line width in points, not metres, so the stroke stays the same weight on screen
+            // while the ring itself stays true to the ground. That is the combination the
+            // sticker language wants: a constant heavy outline around a shape that is
+            // genuinely out there in the world.
+            func ring(_ identifier: String, width: CGFloat, colour: UIColor) -> MLNLineStyleLayer {
+                let layer = MLNLineStyleLayer(identifier: identifier, source: source)
+                layer.predicate = NSPredicate(format: "ring == %@", identifier)
+                layer.lineColor = NSExpression(forConstantValue: colour)
+                layer.lineWidth = NSExpression(forConstantValue: width)
+                layer.lineCap = NSExpression(forConstantValue: "round")
+                layer.lineJoin = NSExpression(forConstantValue: "round")
+                return layer
+            }
+
+            // The outer ring is the quieter one: it marks where people stop existing, which
+            // is information rather than an invitation. The inner one is where you can act,
+            // so it carries the accent.
+            let discovery = ring("discovery", width: 2.5, colour: UIColor.white.withAlphaComponent(0.85))
+            let interaction = ring("interaction", width: 4, colour: UIColor(Ink.text).withAlphaComponent(0.55))
+            radarLines = [discovery, interaction]
+
+            // Below the first symbol layer, which is where labels start.
+            let firstLabel = style.layers.first { $0 is MLNSymbolStyleLayer }
+            for layer in radarLines {
+                if let firstLabel {
+                    style.insertLayer(layer, below: firstLabel)
+                } else {
+                    style.addLayer(layer)
+                }
+            }
         }
 
         /// Two symbol layers: a shadow lying on the road, and a bear standing up off it.
@@ -183,6 +231,31 @@ struct MapLibreMap: UIViewRepresentable {
         let lastZoom = context.coordinator.lastZoom
         context.coordinator.lastZoom = zoom
         context.coordinator.aim = { map in camera(for: map, heading: bearing) }
+
+        if let radar {
+            let rings: [(String, Double)] = [
+                ("discovery", Radar.discoveryMetres),
+                ("interaction", Radar.interactionMetres),
+            ]
+            context.coordinator.radarSource?.shape = MLNShapeCollectionFeature(
+                shapes: rings.map { name, metres in
+                    var points = Radar.ring(around: radar.centre, metres: metres)
+                    let line = MLNPolylineFeature(coordinates: &points, count: UInt(points.count))
+                    line.attributes = ["ring": name]
+                    return line
+                }
+            )
+            // Hidden dashes the rings and dims them rather than removing them. Somebody who
+            // has switched themselves off still needs to see the shape of what they switched
+            // off -- an exposure boundary you cannot see is one you cannot reason about, and
+            // the state that hides its own indicator is the one people stop trusting.
+            for layer in context.coordinator.radarLines {
+                layer.lineDashPattern = radar.discoverable
+                    ? nil
+                    : NSExpression(forConstantValue: [2, 2])
+                layer.lineOpacity = NSExpression(forConstantValue: radar.discoverable ? 1.0 : 0.4)
+            }
+        }
 
         context.coordinator.bearSource?.shape = MLNShapeCollectionFeature(
             shapes: bears.map { mark in

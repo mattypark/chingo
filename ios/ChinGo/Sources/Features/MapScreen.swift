@@ -105,7 +105,11 @@ struct MapScreen: View {
                 bearing: camera.bearing,
                 pitch: camera.pitch,
                 zoom: camera.zoom,
-                bears: bears
+                bears: bears,
+                radar: RadarState(
+                    centre: location.coordinateOrFallback,
+                    discoverable: state.discoverable
+                )
             )
             .ignoresSafeArea()
 
@@ -222,6 +226,14 @@ struct MapScreen: View {
             }
         }
         .background(MapStyle.ground(for: accent))
+        #if DEBUG
+        // Re-place the demo people once a real fix lands, not on appear. On appear the
+        // coordinate is still the fallback, so seeding there put them in Dolores Park however
+        // the simulator was pointed -- and then never moved them.
+        .onChange(of: here.lat) { _, _ in
+            DemoSeed.populate(state, around: location.coordinateOrFallback)
+        }
+        #endif
         .task {
             // Ten a second, not sixty. A walk cycle wants eight to twelve frames a second
             // anyway, and the slight stagger of a low frame rate suits a drawn character
@@ -238,11 +250,6 @@ struct MapScreen: View {
             // Apple rejects for. Onboarding owns the request; this only starts updates if
             // permission is already there.
             location.start()
-            #if DEBUG
-            // Put the demo people around wherever the map actually opened, not around the
-            // hardcoded fallback -- otherwise they are always in Dolores Park.
-            DemoSeed.populate(state, around: location.coordinateOrFallback)
-            #endif
             #if DEBUG
             switch DemoSeed.opens {
             case "album": showAlbum = true

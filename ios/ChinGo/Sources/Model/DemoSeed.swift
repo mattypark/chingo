@@ -109,13 +109,22 @@ enum DemoSeed {
         // Scattered around the fallback position at real metre offsets, each in a different
         // colour and half of them walking, so the bear layer exercises tinting, idle, walk
         // and depth sorting rather than five identical statues in a line.
+        // Out, not hidden. Discovery is off by default in the real app and that is correct,
+        // but a demo that opens hidden shows dashed grey rings and no bears -- which is the
+        // state working exactly as designed and looking like nothing was built.
+        state.discoverable = true
+
         let base = around ?? LocationService.fallback
         let people: [(String, Int, Double, Double, Int, Double?)] = [
-            ("priya",   40,  0.00009,  0.00007, 6, 145),
-            ("sam",     80, -0.00013,  0.00011, 3, nil),
-            ("marcus", 120,  0.00016, -0.00014, 4, 20),
-            ("dana",   160, -0.00019, -0.00009, 1, nil),
-            ("wren",   200,  0.00006,  0.00019, 5, 300),
+            // Spread over roughly 25 to 90 metres, which at the zoom the map opens at puts
+            // them between the player puck and the discovery ring. Tighter than this and they
+            // all hide behind the puck; wider and they are outside the ring they are supposed
+            // to be inside.
+            ("priya",   40,  0.00022,  0.00018, 6, 145),
+            ("sam",     80, -0.00034,  0.00026, 3, nil),
+            ("marcus", 120,  0.00046, -0.00038, 4, 20),
+            ("dana",   160, -0.00052, -0.00024, 1, nil),
+            ("wren",   200,  0.00018,  0.00058, 5, 300),
         ]
         state.nearby = people.map { handle, metres, dLat, dLon, accent, course in
             NearbyPerson(
