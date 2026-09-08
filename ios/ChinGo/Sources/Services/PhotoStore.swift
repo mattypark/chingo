@@ -8,8 +8,18 @@ import UIKit
 /// cost the user never agreed to.
 enum PhotoStore {
 
-    private static var directory: URL {
-        let base = URL.applicationSupportDirectory.appending(path: "catches")
+    private static var directory: URL { folder("catches") }
+
+    /// Portraits live beside the catches, not among them.
+    ///
+    /// Two reasons, and the second is the real one. A portrait is not reproducible from
+    /// anybody else's copy the way a catch photo is, so the backup argument below does not
+    /// transfer to it; and keeping them apart means a future "delete every photo of a person"
+    /// can walk the catch folder without having to know which files are faces.
+    private static var portraits: URL { folder("portraits") }
+
+    private static func folder(_ name: String) -> URL {
+        let base = URL.applicationSupportDirectory.appending(path: name)
         if !FileManager.default.fileExists(atPath: base.path) {
             try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
             var url = base
@@ -45,6 +55,33 @@ enum PhotoStore {
     static func delete(_ name: String?) {
         guard let name else { return }
         try? FileManager.default.removeItem(at: directory.appending(path: name))
+    }
+
+    // MARK: Portraits
+
+    /// 512px, not 1600. A portrait is drawn at 38 points on a card and 96 in the profile, and
+    /// storing a nine-megapixel selfie to show it at 38 points is a cost nobody agreed to.
+    @discardableResult
+    static func savePortrait(_ image: UIImage) -> String? {
+        guard let data = downscaled(image, maxDimension: 512).jpegData(compressionQuality: 0.85)
+        else { return nil }
+        let name = "\(UUID().uuidString).jpg"
+        do {
+            try data.write(to: portraits.appending(path: name), options: .atomic)
+            return name
+        } catch {
+            return nil
+        }
+    }
+
+    static func loadPortrait(_ name: String?) -> UIImage? {
+        guard let name else { return nil }
+        return UIImage(contentsOfFile: portraits.appending(path: name).path)
+    }
+
+    static func deletePortrait(_ name: String?) {
+        guard let name else { return }
+        try? FileManager.default.removeItem(at: portraits.appending(path: name))
     }
 
     private static func downscaled(_ image: UIImage, maxDimension: CGFloat) -> UIImage {

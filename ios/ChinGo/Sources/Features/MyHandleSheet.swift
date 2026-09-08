@@ -34,6 +34,12 @@ struct MyHandleSheet: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, Space.margin)
                 } else {
+                    // Your face above your name, because this screen is held out to somebody
+                    // who is standing in front of you. A handle alone makes them check a
+                    // spelling; a handle under the face they are looking at makes them check
+                    // nothing.
+                    PortraitWell(portraitFile: me.first?.portraitFile, diameter: 84)
+
                     Text(handle)
                         .font(.custom(Typeface.bagel, size: 46))
                         .foregroundStyle(accent.onSignal)

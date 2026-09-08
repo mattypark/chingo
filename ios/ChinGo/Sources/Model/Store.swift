@@ -152,6 +152,15 @@ final class MeRecord {
     /// switch would mean somebody who declined push also silently lost a feature that never
     /// involved push.
     var wantsMemoryNudges: Bool = true
+
+    /// A face, if you want one. Optional in every sense: the type, the product decision, and
+    /// the migration.
+    ///
+    /// The bear is the identity on the map and stays the identity on the map -- a portrait is
+    /// a face on a card, not a body on a street, and swapping the avatar for a photograph
+    /// would put a stranger's face at eye level in public, which is the shape of thing App
+    /// Review guideline 1.2 exists for. So this shows where a face belongs and nowhere else.
+    var portraitFile: String?
     var ageTier: Int
 
     /// When onboarding was completed. Nil means it has not been.

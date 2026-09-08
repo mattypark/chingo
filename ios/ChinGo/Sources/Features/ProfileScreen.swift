@@ -23,6 +23,7 @@ struct ProfileScreen: View {
     @Environment(\.modelContext) private var context
     @State private var selected: FriendRecord?
     @State private var editing = false
+    @State private var pickingPortrait = false
 
     private var identity: MeRecord? { me.first }
 
@@ -57,6 +58,19 @@ struct ProfileScreen: View {
             // the artwork and turn a header into a card.
             .ignoresSafeArea(edges: .top)
         }
+        .fullScreenCover(isPresented: $pickingPortrait) {
+            CameraPicker { image in
+                guard let identity else { return }
+                // Written before the old one is deleted. If the write fails there is still a
+                // portrait, which is a better failure than a profile that silently loses its
+                // face because the camera roll handed back something unencodable.
+                guard let saved = PhotoStore.savePortrait(image) else { return }
+                PhotoStore.deletePortrait(identity.portraitFile)
+                identity.portraitFile = saved
+                try? context.save()
+            }
+            .ignoresSafeArea()
+        }
         .sheet(isPresented: $editing) {
             IdentityEditor(record: identity ?? newIdentity())
                 .presentationDetents([.height(560)])
@@ -88,25 +102,23 @@ struct ProfileScreen: View {
             )
             .frame(height: 190)
 
-            ZStack {
-                Circle()
-                    .fill(Ink.ground)
-                Circle()
-                    .strokeBorder(Ink.text, lineWidth: 3)
-                Circle()
-                    .trim(from: 0, to: max(0.02, state.levelProgress))
-                    .stroke(accent.signal, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .padding(6)
-                Image("Mascot")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 58)
-                    .offset(y: 4)
-            }
-            .frame(width: 104, height: 104)
-            .compositingGroup()
-            .shadow(color: Ink.text, radius: 0, x: Sticker.drop, y: Sticker.drop)
+            // Your face if you set one, your bear if you did not, and the level gauge around
+            // whichever it is. This used to draw the raw berry mascot -- so the one avatar in
+            // the app that was definitely *you* was the only one not in your colour.
+            PortraitWell(
+                portraitFile: identity?.portraitFile,
+                diameter: 96,
+                progress: state.levelProgress,
+                onPick: { pickingPortrait = true },
+                onClear: {
+                    guard let identity else { return }
+                    // The file goes with the field. A portrait nobody can reach is still a
+                    // photograph of a face sitting in Application Support.
+                    PhotoStore.deletePortrait(identity.portraitFile)
+                    identity.portraitFile = nil
+                    try? context.save()
+                }
+            )
             // Straddling the edge is what makes it a profile rather than a card with a
             // coloured lid.
             .offset(y: 46)
