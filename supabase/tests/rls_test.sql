@@ -19,14 +19,22 @@ values
   ('bbbbbbbb-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000',
    'authenticated', 'authenticated', 'b@test.local', 'x', now(), now(), now()),
   ('cccccccc-0000-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000',
-   'authenticated', 'authenticated', 'c@test.local', 'x', now(), now(), now());
+   'authenticated', 'authenticated', 'c@test.local', 'x', now(), now(), now()),
+  ('dddddddd-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'd@test.local', 'x', now(), now(), now());
 
 -- Seeded as superuser so RLS is bypassed. The data genuinely exists, which is what makes a
 -- later count of zero prove policy rather than absence.
-insert into public.profiles (id, handle, is_16_plus) values
-  ('aaaaaaaa-0000-4000-8000-000000000001', 'ana',  true),
-  ('bbbbbbbb-0000-4000-8000-000000000002', 'bo',   true),
-  ('cccccccc-0000-4000-8000-000000000003', 'cass', true);
+insert into public.profiles (id, handle, is_16_plus, onboarded_at) values
+  ('aaaaaaaa-0000-4000-8000-000000000001', 'ana',  true,  now()),
+  ('bbbbbbbb-0000-4000-8000-000000000002', 'bo',   true,  now()),
+  ('cccccccc-0000-4000-8000-000000000003', 'cass', true,  now()),
+  -- D failed the age gate. Not onboarded, and the database must keep it that way.
+  ('dddddddd-0000-4000-8000-000000000004', 'dee',  false, null);
+
+-- B has blocked C.
+insert into public.blocks (blocker, blocked) values
+  ('bbbbbbbb-0000-4000-8000-000000000002', 'cccccccc-0000-4000-8000-000000000003');
 
 -- A and B are friends. C is a stranger to both.
 insert into public.bonds (lo, hi, meetups, distinct_places) values
@@ -137,6 +145,112 @@ begin
   select count(*) into n from public.profiles;
   if n <> 1 then raise exception 'FAIL: a stranger saw % profiles, expected only self', n; end if;
   raise notice 'PASS: a stranger sees only themselves';
+
+  -- 8. A handle is a public address: taken-or-not is answerable, and the answer is
+  --    case-insensitive and shape-checked.
+  if public.handle_available('ana') or public.handle_available('ANA') then
+    raise exception 'FAIL: a taken handle reported as available';
+  end if;
+  if not public.handle_available('zed') then
+    raise exception 'FAIL: a free handle reported as taken';
+  end if;
+  if public.handle_available('not a handle!') then
+    raise exception 'FAIL: a malformed handle reported as available';
+  end if;
+  raise notice 'PASS: handle availability answers without exposing a profile';
+
+  -- 9. Knocking on a handle creates a pending TAG that only the receiver can accept.
+  perform public.request_tag('ana', 'cell-alpha');
+  select count(*) into n from public.catches
+    where initiator = 'cccccccc-0000-4000-8000-000000000003'
+      and receiver = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and kind = 'tag' and accepted_at is null;
+  if n <> 1 then raise exception 'FAIL: request_tag created % rows, expected 1', n; end if;
+  raise notice 'PASS: adding by handle is a request, not a collection';
+
+  -- 10. Knocking twice does not knock twice.
+  perform public.request_tag('ana', 'cell-alpha');
+  select count(*) into n from public.catches
+    where initiator = 'cccccccc-0000-4000-8000-000000000003'
+      and receiver = 'aaaaaaaa-0000-4000-8000-000000000001';
+  if n <> 1 then raise exception 'FAIL: a second request_tag made % rows', n; end if;
+  raise notice 'PASS: one pending request per pair';
+
+  -- 11. A handle that does not exist, and a person who has blocked you, look identical:
+  --     nothing happens and nothing is said.
+  perform public.request_tag('nobody_here', 'cell-alpha');
+  perform public.request_tag('bo', 'cell-alpha');
+  select count(*) into n from public.catches
+    where initiator = 'cccccccc-0000-4000-8000-000000000003'
+      and receiver <> 'aaaaaaaa-0000-4000-8000-000000000001';
+  if n <> 0 then raise exception 'FAIL: request_tag reached a blocker or a ghost (% rows)', n; end if;
+  raise notice 'PASS: a blocker and a non-existent handle are indistinguishable';
+
+  -- 12. The block list is for the server. A client asking gets permission denied, because
+  --     the answer would tell them who blocked them.
+  begin
+    perform public.block_relations_for('cccccccc-0000-4000-8000-000000000003');
+    raise exception 'FAIL: a client read block relations';
+  exception when insufficient_privilege then
+    raise notice 'PASS: block relations are not client-readable';
+  end;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- As D, who failed the age gate
+-- ---------------------------------------------------------------------------
+set local request.jwt.claims = '{"sub":"dddddddd-0000-4000-8000-000000000004","role":"authenticated"}';
+
+do $$
+begin
+  -- 13. The gate is a constraint, not a screen. A client that skips the step cannot mark
+  --     itself onboarded.
+  begin
+    update public.profiles set onboarded_at = now()
+      where id = 'dddddddd-0000-4000-8000-000000000004';
+    raise exception 'FAIL: an under-age profile was marked onboarded';
+  exception when check_violation then
+    raise notice 'PASS: onboarding cannot complete without the age assertion';
+  end;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- As C again: leaving takes everything with it
+-- ---------------------------------------------------------------------------
+set local request.jwt.claims = '{"sub":"cccccccc-0000-4000-8000-000000000003","role":"authenticated"}';
+
+do $$
+begin
+  -- 14. Guideline 5.1.1(v). One call, and the account, the profile, the pending request
+  --     and the block against them are all gone.
+  perform public.delete_me();
+end $$;
+
+reset role;
+
+do $$
+declare n integer;
+begin
+  select count(*) into n from auth.users where id = 'cccccccc-0000-4000-8000-000000000003';
+  if n <> 0 then raise exception 'FAIL: delete_me left the auth row'; end if;
+  select count(*) into n from public.profiles where id = 'cccccccc-0000-4000-8000-000000000003';
+  if n <> 0 then raise exception 'FAIL: delete_me left the profile'; end if;
+  select count(*) into n from public.catches where initiator = 'cccccccc-0000-4000-8000-000000000003';
+  if n <> 0 then raise exception 'FAIL: delete_me left % pending catches', n; end if;
+  select count(*) into n from public.blocks where blocked = 'cccccccc-0000-4000-8000-000000000003';
+  if n <> 0 then raise exception 'FAIL: delete_me left the block row'; end if;
+  raise notice 'PASS: deleting an account cascades through everything that referenced it';
+
+  -- 15. With the service role the block list is readable, and it runs both directions.
+  select count(*) into n from public.block_relations_for('bbbbbbbb-0000-4000-8000-000000000002');
+  -- C is deleted now, so B's list is empty; seed a fresh block to prove both directions.
+  insert into public.blocks (blocker, blocked) values
+    ('aaaaaaaa-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000004');
+  select count(*) into n from public.block_relations_for('dddddddd-0000-4000-8000-000000000004');
+  if n <> 1 then raise exception 'FAIL: block_relations_for missed the blocked-by direction (%)', n; end if;
+  select count(*) into n from public.block_relations_for('aaaaaaaa-0000-4000-8000-000000000001');
+  if n <> 1 then raise exception 'FAIL: block_relations_for missed the blocker direction (%)', n; end if;
+  raise notice 'PASS: the server sees blocks in both directions';
 end $$;
 
 -- ---------------------------------------------------------------------------

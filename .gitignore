@@ -33,3 +33,6 @@ supabase/.temp/
 
 # Generated art candidates kept out of git until one is chosen
 assets/logo/candidates/
+
+# Wrangler local secrets. Same rule as .env: the example ships, the real one never does.
+worker/.dev.vars
