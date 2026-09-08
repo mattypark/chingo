@@ -25,7 +25,6 @@ struct MapScreen: View {
     @State private var openMemory: MemoryRecord?
     @State private var showProfile = false
     @State private var catchMenu = false
-    @State private var deckMenu = false
     @State private var showCatch = false
     @State private var showAlbum = false
     @State private var showGlobe = false
@@ -309,36 +308,12 @@ struct MapScreen: View {
             }
             .padding(.horizontal, Space.inset)
             .padding(.bottom, Space.margin)
-            .opacity(catchMenu || deckMenu ? 0 : 1)
+            .opacity(catchMenu ? 0 : 1)
 
             // Above the chrome, because it is the one thing on the map you are meant to act
             // on the moment it appears.
             revealLayer
-                .opacity(catchMenu || deckMenu ? 0 : 1)
-
-            if deckMenu {
-                ListMenu(
-                    // Widest first. The pills are sized by their labels, so ordering them
-                    // long to short gives the stack one clean diagonal edge instead of a
-                    // ragged one, and puts the close button at the narrow end.
-                    //
-                    // The visibility toggle is deliberately not here. It already lives in the
-                    // top-right pill on the map, where it belongs — it is a state you are in,
-                    // not an errand you run, and having it in two places made it read as a
-                    // fourth destination.
-                    //
-                    // Profile is gone for the same reason: tapping the bear in the bar opens
-                    // it, so a second door to it was a menu row spent on nothing. Its slot
-                    // went to the other half of "Add someone" — the handle you hand over.
-                    options: [
-                        RadialOption(icon: "person.badge.plus", label: "Add someone") { showAddFriend = true },
-                        RadialOption(icon: "at", label: "My handle") { showMyHandle = true },
-                        RadialOption(icon: "square.grid.2x2.fill", label: "Album") { showAlbum = true },
-                        RadialOption(icon: "globe", label: "Globe") { showGlobe = true },
-                    ],
-                    onClose: { deckMenu = false }
-                )
-            }
+                .opacity(catchMenu ? 0 : 1)
 
             // The photo going where photos go. Without it a catch ends with a sheet closing
             // and nothing to show for it, and the album becomes a place things are simply
@@ -371,7 +346,22 @@ struct MapScreen: View {
             if catchMenu {
                 RadialMenu(
                     title: state.canCatch ? "Catch someone" : "Nobody nearby yet",
+                    // Everything you might do about a person, on the button your thumb is
+                    // already on. This absorbed the deck menu, which was a second door in the
+                    // opposite corner holding the same errands -- adding somebody, handing
+                    // over your handle, looking at what you caught. They are all one subject,
+                    // and having them in two places made neither of them the answer.
+                    //
+                    // The visibility toggle is still deliberately not here. It lives in the
+                    // top-right pill, because it is a state you are in rather than an errand
+                    // you run. Profile is not here either: tapping the bear opens it.
                     options: [
+                        RadialOption(icon: "square.grid.2x2.fill", label: "Album") {
+                            showAlbum = true
+                        },
+                        RadialOption(icon: "at", label: "My handle") {
+                            showMyHandle = true
+                        },
                         RadialOption(icon: "person.badge.plus", label: "By handle") {
                             showAddFriend = true
                         },
@@ -438,7 +428,6 @@ struct MapScreen: View {
             case "album": showAlbum = true
             case "profile": showProfile = true
             case "catch": catchMenu = true
-            case "deck": deckMenu = true
             case "globe": showGlobe = true
             default: break
             }
@@ -606,32 +595,22 @@ struct MapScreen: View {
                 catchPulse += 1
                 showCatch = true
             },
-            onDeck: { withAnimation(Motion.arrive) { deckMenu = true } }
+            onGlobe: { showGlobe = true }
         )
         .overlay(alignment: .topTrailing) {
             // Neither of these can be a fourth cell in the bar. The compass only exists once
             // you have turned the view, and a cell that appears and disappears breaks the bar
             // into two different shapes; the globe is a place you go rather than a thing you
             // do here. So they stack above the end of the bar instead.
-            VStack(spacing: Space.tight) {
-                Button { showGlobe = true } label: {
-                    Image(systemName: "globe")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(accent.signal)
-                        .frame(width: 44, height: 44)
+            // Only the compass floats here now. The globe moved into the bar, and two doors
+            // to the same place a thumb's width apart is one more than there should be.
+            if !camera.isFollowingCourse {
+                CompassRose(bearing: camera.bearing) {
+                    camera.recenter(course: location.course)
                 }
-                .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
-                .hitTarget()
-                .accessibilityLabel("See where your friends are")
-
-                if !camera.isFollowingCourse {
-                    CompassRose(bearing: camera.bearing) {
-                        camera.recenter(course: location.course)
-                    }
-                    .transition(.scale.combined(with: .opacity))
-                }
+                .transition(.scale.combined(with: .opacity))
+                .offset(y: -Space.section)
             }
-            .offset(y: -Space.section)
         }
         .animation(Motion.surface, value: camera.isFollowingCourse)
     }

@@ -30,7 +30,7 @@ struct HomeBar: View {
     var onProfile: () -> Void
     var onCatch: () -> Void
     var onCatchHold: () -> Void
-    var onDeck: () -> Void
+    var onGlobe: () -> Void
 
     /// How far the catch button stands above the slab. Enough that it is unmistakably in
     /// front, little enough that it still reads as belonging to the bar rather than hovering
@@ -63,7 +63,7 @@ struct HomeBar: View {
             rule
             Color.clear.frame(width: Self.well)
             rule
-            deckCell
+            globeCell
         }
         .frame(height: Self.height)
         .sticker(fill: Ink.groundRaised, radius: Radius.surface)
@@ -111,16 +111,22 @@ struct HomeBar: View {
         .accessibilityLabel("You, level \(level)")
     }
 
-    /// Everything else. One door rather than a row of orbs, so the map keeps the screen.
-    private var deckCell: some View {
-        Button(action: onDeck) {
-            Image(systemName: "square.stack.3d.up.fill")
+    /// The planet.
+    ///
+    /// This slot used to be a stack-of-cards icon opening a menu of four destinations, which
+    /// was one door too many: the errands on it -- add somebody, your handle, the album -- are
+    /// all things you do *around* a catch, and they belong on the catch button's own menu
+    /// where the thumb already is. What is left is the one thing that is genuinely a different
+    /// place rather than another errand, so it stops being a menu and becomes the place.
+    private var globeCell: some View {
+        Button(action: onGlobe) {
+            Image(systemName: "globe")
                 .font(.system(size: 21, weight: .semibold))
                 .foregroundStyle(Ink.textSoft)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
         }
         .buttonStyle(SquashButtonStyle())
-        .accessibilityLabel("Your friends and what you can do")
+        .accessibilityLabel("See where your friends are")
     }
 }
