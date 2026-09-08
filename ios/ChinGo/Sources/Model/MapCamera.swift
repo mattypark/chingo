@@ -19,7 +19,7 @@ final class MapCamera {
     /// Opens at the engine's maximum rather than short of it. Looking down at a city from
     /// above reads as a map; looking along it reads as standing in it, and the second one is
     /// the whole point of the screen.
-    private(set) var pitch: CGFloat = 62
+    private(set) var pitch: CGFloat = 78
     /// How close in.
     ///
     /// Deliberately above `CameraMath.defaultZoom`, and now at the engine's ceiling. At 17.2
@@ -93,7 +93,7 @@ final class MapCamera {
         // Back to the opening rake, not to some other angle. This used to snap to 58 while
         // the map opens at 70, so recentring quietly flattened the view and there was no way
         // back to the angle the app starts at.
-        pitch = 62
+        pitch = 78
         bearing = course ?? 0
     }
 

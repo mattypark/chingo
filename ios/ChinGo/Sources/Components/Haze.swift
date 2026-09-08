@@ -1,5 +1,6 @@
 import SwiftUI
 import ChinGoDesign
+import ChinGoEngine
 
 /// Distance, on a map that has none.
 ///
@@ -29,29 +30,55 @@ import ChinGoDesign
 /// because the alternative is not available on this renderer.
 struct Haze: View {
 
-    /// Blend factor against `Ink.mapHaze`, keyed on fraction of screen height.
+    /// How far the camera is raked back. The haze starts wherever the horizon is.
+    var pitch: Double
+
+    /// Blend factor against `Ink.mapHaze`, keyed on how far *below the horizon* a point is,
+    /// as a fraction of the ground still visible under it.
     ///
-    /// Starts at the horizon rather than at the top of the screen -- above the horizon is
-    /// `SkyBand`'s problem, and doubling the two would double-tint the strip where they meet.
-    private static let ramp: [(location: CGFloat, alpha: Double)] = [
-        (SkyBand.horizon, 0.42),
-        (0.270, 0.400),
-        (0.310, 0.386),
-        (0.378, 0.287),
-        (0.436, 0.219),
-        (0.504, 0.151),
-        (0.562, 0.122),
-        (0.621, 0.080),
-        (0.747, 0.054),
-        (0.873, 0.012),
+    /// Stated relative to the horizon rather than to the screen, because the horizon moves
+    /// with pitch and these numbers were solved from a reference frame with its own. Keyed to
+    /// absolute screen fractions they would only be correct at one camera angle -- which was
+    /// the previous version's bug, in a file whose own comment says the ramp is
+    /// pitch-specific.
+    /// Scaled back from the measured curve, and the reason is geometry rather than taste.
+    ///
+    /// The reference numbers were solved from a frame whose camera showed far less ground per
+    /// screen inch. Now that there is a real horizon the same alphas cover a much deeper strip
+    /// of world, so the mid-distance -- where most of the street grid actually is -- went to
+    /// pale wash and the roads disappeared. The shape of the falloff is what matters and it is
+    /// unchanged; only the depth of it is down about a quarter.
+    private static let ramp: [(depth: CGFloat, alpha: Double)] = [
+        (0.000, 0.32),
+        (0.040, 0.305),
+        (0.092, 0.292),
+        (0.181, 0.216),
+        (0.257, 0.163),
+        (0.346, 0.112),
+        (0.422, 0.090),
+        (0.500, 0.058),
+        (0.665, 0.038),
+        (0.831, 0.009),
         (1.000, 0.000),
     ]
+
+    /// The ramp, mapped onto this camera's actual screen.
+    private var stops: [Gradient.Stop] {
+        let horizon = SkyBand.horizon(atPitch: pitch) ?? 0
+        let ground = max(1 - horizon, 0.01)
+        return [.init(color: Ink.mapHaze.opacity(0), location: 0)]
+            + Self.ramp.map {
+                .init(
+                    color: Ink.mapHaze.opacity($0.alpha),
+                    location: min(horizon + $0.depth * ground, 1)
+                )
+            }
+    }
 
     var body: some View {
         ZStack {
             LinearGradient(
-                stops: [.init(color: Ink.mapHaze.opacity(0), location: 0)]
-                    + Self.ramp.map { .init(color: Ink.mapHaze.opacity($0.alpha), location: $0.location) },
+                stops: stops,
                 startPoint: .top,
                 endPoint: .bottom
             )

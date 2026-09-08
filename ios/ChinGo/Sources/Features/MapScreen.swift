@@ -257,9 +257,14 @@ struct MapScreen: View {
                 .ignoresSafeArea()
             // Above the map, below everything printed on it. The haze goes first: it is part
             // of the ground, and the sky has to be able to sit on top of where it ends.
-            Haze()
+            Haze(pitch: camera.pitch)
                 .ignoresSafeArea()
-            SkyBand(latitude: here.lat, longitude: here.lon, bearing: camera.bearing)
+            SkyBand(
+                latitude: here.lat,
+                longitude: here.lon,
+                bearing: camera.bearing,
+                pitch: camera.pitch
+            )
 
             memoryLayer
             PlayerPuck(

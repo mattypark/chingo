@@ -1,5 +1,6 @@
 import SwiftUI
 import ChinGoDesign
+import ChinGoEngine
 
 /// The sky, tracking the real sun where the player actually is.
 ///
@@ -23,23 +24,37 @@ struct SkyBand: View {
     var longitude: Double
     /// Where the camera is facing, so the sun can be placed relative to it.
     var bearing: Double
+    /// How far the camera is raked back. The horizon moves with it.
+    var pitch: Double
 
     @State private var sun: Sky.Position
 
-    /// How much of the screen the haze reaches down.
-    private static let reach: CGFloat = 0.30
-    /// Where the horizon sits, as a fraction of screen height, at the raked-back pitch the
-    /// map opens at. Measured off the render rather than derived -- the projection depends on
-    /// pitch, zoom and field of view together, and a number read off the thing it has to
-    /// match is more honest than three approximations multiplied.
-    /// Shared with `Haze`, which has to start exactly where this ends. Two files disagreeing
-    /// about where the horizon is would show up as a seam across the middle of the screen.
-    static let horizon: CGFloat = 0.24
+    /// Where the horizon actually is, for a given pitch.
+    ///
+    /// This used to be a constant -- 0.24, "measured off the render rather than derived",
+    /// which sounded careful and was wrong. The camera could not reach a pitch that put the
+    /// horizon on screen at all, so what was measured was where the sky *looked* like it
+    /// ended, and the band was being painted over live map tiles the whole time. That is why
+    /// the sun and the clouds never sat right on anything.
+    ///
+    /// It is derived now, from the renderer's own field of view. Nil means the horizon is
+    /// above the top of the frame, in which case there is no sky to draw.
+    static func horizon(atPitch pitch: Double) -> CGFloat? {
+        CameraMath.horizonFraction(atPitch: pitch).map { CGFloat($0) }
+    }
 
-    init(latitude: Double, longitude: Double, bearing: Double) {
+    /// How far down the screen the sky reaches, including the haze under the horizon line.
+    ///
+    /// A quarter again past the horizon. The band cannot stop exactly at the horizon -- the
+    /// point where sky meets ground is the lowest-contrast part of the frame in the reference,
+    /// not a line -- so it carries on a little way down and the mask fades it out.
+    private var reach: CGFloat { (Self.horizon(atPitch: pitch) ?? 0) * 1.25 }
+
+    init(latitude: Double, longitude: Double, bearing: Double, pitch: Double) {
         self.latitude = latitude
         self.longitude = longitude
         self.bearing = bearing
+        self.pitch = pitch
         _sun = State(initialValue: SkyBand.currentPosition(latitude, longitude))
     }
 
@@ -49,11 +64,11 @@ struct SkyBand: View {
         GeometryReader { geo in
             ZStack(alignment: .top) {
                 LinearGradient(colors: [band.high, band.low], startPoint: .top, endPoint: .bottom)
-                    .frame(height: geo.size.height * Self.reach)
+                    .frame(height: geo.size.height * reach)
                     .mask { horizonMask }
 
                 Clouds(bearing: bearing, tint: band.high)
-                    .frame(height: geo.size.height * Self.reach)
+                    .frame(height: geo.size.height * reach)
                     // The same horizon the gradient uses. Without it the low deck drifts on
                     // past the skyline and ends up as pale blobs lying across the street,
                     // which reads as a rendering fault rather than as weather.
@@ -158,7 +173,7 @@ struct SkyBand: View {
 
         let x = size.width * (0.5 + offset / 150)
         // Altitude lifts it off the horizon. Compressed for the same reason as the arc.
-        let y = size.height * (Self.horizon - CGFloat(sun.altitude) * 0.007)
+        let y = size.height * ((Self.horizon(atPitch: pitch) ?? 0) - CGFloat(sun.altitude) * 0.007)
         return CGPoint(x: x, y: y)
     }
 

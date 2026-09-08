@@ -14,9 +14,41 @@ public enum CameraMath {
     public static let degreesPerHorizontalPoint: Double = 0.42
     public static let degreesPerVerticalPoint: Double = 0.20
 
-    /// Straight down reads as a floor plan and loses the buildings; past ~70 the horizon
-    /// comes into view and the tiles run out behind it.
-    public static let pitchRange: ClosedRange<Double> = 25...70
+    /// Straight down reads as a floor plan. The upper end used to be 70 because "past ~70 the
+    /// horizon comes into view and the tiles run out behind it" -- which was true, and was
+    /// exactly backwards as a reason to stop there.
+    ///
+    /// The horizon coming into view is the point. What lies beyond it is not missing tiles,
+    /// it is sky, and `SkyBand` has been drawing sky since before this range was written. The
+    /// old ceiling meant the horizon was *never* on screen at any pitch the camera could
+    /// reach, so the sky band was painting a hardcoded fraction of the screen over live map
+    /// tiles -- which is why the sun and the clouds have never sat right on anything.
+    public static let pitchRange: ClosedRange<Double> = 25...82
+
+    /// MapLibre's default vertical field of view, in degrees.
+    ///
+    /// Not a guess and not tunable from here -- it is the renderer's own constant (0.6435
+    /// radians), and every horizon calculation below is only true because it matches.
+    public static let verticalFieldOfView: Double = 36.87
+
+    /// Where the horizon falls, as a fraction of screen height from the top.
+    ///
+    /// Returns nil when it is off the top of the frame, which is the honest answer for any
+    /// pitch below about 72 and is what the old camera did at every angle it allowed.
+    ///
+    /// The geometry: pitch is measured from straight down, so the horizon sits `90 - pitch`
+    /// degrees above the camera's axis. Divide that by the half-angle of the view and you have
+    /// how far up the frame it lands, in half-heights from the centre.
+    public static func horizonFraction(atPitch pitch: Double) -> Double? {
+        let aboveAxis = 90 - pitch
+        guard aboveAxis > 0 else { return 0 }
+
+        let halfAngle = verticalFieldOfView / 2 * .pi / 180
+        let offset = tan(aboveAxis * .pi / 180) / tan(halfAngle)
+        guard offset < 1 else { return nil }
+
+        return 0.5 - offset * 0.5
+    }
 
     /// Below 15.5 the buildings stop extruding and the city becomes a road diagram. 20 is
     /// where Pokémon GO sits. It overzooms the z14 tiles 64×, which is why this used to stop
