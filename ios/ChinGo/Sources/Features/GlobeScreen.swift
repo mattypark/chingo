@@ -21,12 +21,24 @@ struct GlobeScreen: View {
     @Query(sort: \FriendRecord.metDate, order: .reverse) private var friends: [FriendRecord]
     @Query private var me: [MeRecord]
 
+    /// Injected rather than `@Environment(\.dismiss)`, and that is the whole reason this
+    /// screen is no longer a `.fullScreenCover`: a presentation gives no transition hook and
+    /// `matchedGeometryEffect` cannot cross a presentation boundary, so the globe now lives
+    /// in the map's own stack and is told how to leave it.
+    var onClose: () -> Void
+    /// Debug only: a counter the map bumps to trigger the real exit from outside. See
+    /// `DemoSeed.tour`.
+    var leaveOn: Int = 0
+
     @State private var selected: GlobePin?
     @State private var fitToken = 0
     @State private var projection = GlobeProjection()
     @AppStorage("globeLook") private var look: GlobeLook = GlobeLook.fallback
     @State private var pickingLook = false
-    @Environment(\.dismiss) private var dismiss
+    /// False for the first frame, so the chrome has somewhere to pop in from. Also what the
+    /// exit runs backwards through: it drops before `onClose`, so the globe's own chrome is
+    /// gone before the screen is taken away.
+    @State private var appeared = false
     /// Who the camera is looking at, and a counter so tapping the same person twice flies
     /// back to them rather than doing nothing.
     @State private var focus: GlobePin?
@@ -104,12 +116,25 @@ struct GlobeScreen: View {
             // it and a close button on its own row -- so the screen read as a picture of a map
             // inside the app rather than as the map. A map with a margin is a diagram.
             VStack(spacing: 0) {
-                topBar
+                topBar.pops(hidden: !appeared, rank: 0)
                 Spacer(minLength: 0)
-                bottomBar
+                bottomBar.pops(hidden: !appeared, rank: 1)
             }
         }
         .ignoresSafeArea()
+        // The planet itself does not pop -- it is the ground, not a thing printed on it, and
+        // a shrinking world would read as the screen zooming rather than as chrome arriving.
+        //
+        // `Motion.tap` and not `Motion.surface`: at surface speed the world took 0.42s to
+        // come up over the opaque floor beneath it, and because the map's chrome had already
+        // left there were four frames of nothing but cream in the middle of the swap. Short
+        // enough and the new world is under the old chrome while that chrome is still leaving,
+        // which is the whole illusion -- the ground changes, the stickers come off.
+        .opacity(appeared ? 1 : 0)
+        .task {
+            withAnimation(Motion.tap) { appeared = true }
+        }
+        .onChange(of: leaveOn) { _, _ in leave() }
         .sheet(item: $selected) { pin in
             GlobePinCard(pin: pin)
                 .presentationDetents([.height(230)])
@@ -283,7 +308,7 @@ struct GlobeScreen: View {
                     fitToken += 1
                 }
                 rule
-                cell(icon: "map.fill", label: "Map", enabled: true) { dismiss() }
+                cell(icon: "map.fill", label: "Map", enabled: true) { leave() }
             }
             .frame(height: 74)
             .sticker(fill: Ink.groundRaised, radius: Radius.surface)
@@ -299,6 +324,21 @@ struct GlobeScreen: View {
             .fill(Ink.text)
             .frame(width: 3)
             .padding(.vertical, Space.snug)
+    }
+
+    /// The globe's chrome leaves before the globe does.
+    ///
+    /// Dropping `appeared` and calling `onClose` in the same breath would take the screen away
+    /// underneath its own exit, so nothing would be seen to leave -- the map would simply be
+    /// there again. The wait is one `Motion.dismiss` plus the last piece's stagger.
+    private func leave() {
+        guard !Motion.reduceMotion else { return onClose() }
+
+        withAnimation(Motion.dismiss) { appeared = false }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(310))
+            onClose()
+        }
     }
 
     private func cell(

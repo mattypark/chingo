@@ -107,6 +107,21 @@ enum DemoSeed {
         return args[args.index(after: i)]
     }
 
+    /// `-tour globe` opens the globe a beat after launch and leaves again a beat later.
+    ///
+    /// `-open globe` lands you inside it, which is the right flag for looking at the screen
+    /// and the wrong one for looking at the way in: by the time anything is recorded the
+    /// transition has already happened. A tour drives the door both ways so the staggered
+    /// swap can actually be filmed, which is the only way to tell whether the pieces are
+    /// ordered or merely all fading together.
+    static var tour: String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-tour"), args.index(after: i) < args.endIndex else {
+            return nil
+        }
+        return args[args.index(after: i)]
+    }
+
     /// `-autoSubmit` presses the question's own primary button a beat after it appears.
     ///
     /// Sibling of `-open`, and there for a stronger version of the same reason. `simctl` can

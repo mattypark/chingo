@@ -19,12 +19,27 @@ import ChinGoEngine
 /// It is nearly free here for a reason peculiar to this screen -- the player is pinned dead
 /// centre by construction, so there is no marker to track.
 ///
-/// **The ellipse is real, though.** A circle drawn in screen space under a camera raked to 78
-/// degrees is the exact failure `Radar.ring` was written to avoid: it floats in front of your
-/// feet instead of lying on the ground. So the shape is measured rather than assumed -- the
-/// projection is asked where the centre is and where a point 150 metres north and 150 metres
-/// east land, and the ellipse is built from what comes back. Under a pitched camera those two
-/// are wildly different lengths, which is what makes it lie flat.
+/// **The ring is painted on the road, not on the screen.** This used to be a SwiftUI
+/// `Ellipse()` sized from two measured axes -- how far 150 metres north reached, and how far
+/// 150 metres east -- then scaled to a fixed 300 points and centred on the player's feet.
+/// Three things were wrong with that, and they compounded:
+///
+/// - **An axis-aligned ellipse ignores bearing.** A circle on the ground projects to an
+///   ellipse whose long axis follows the horizon, so it rotates as you turn. Measuring only
+///   north-south and east-west pins the ellipse upright, and it visibly slides out from under
+///   the ring painted on the ground beside it as soon as the camera is not facing north.
+/// - **Centring on the feet is not where the ellipse is.** Under a raked camera the far half
+///   of a circle compresses much more than the near half, so the true centre sits well up the
+///   screen. The old code knew this and chose the feet anyway, which is why the shape sat in
+///   front of the bear rather than around it.
+/// - **Rescaling to 300 points severs it from the world.** Once the size no longer means a
+///   distance, the ring stops agreeing with the two real ones underneath it.
+///
+/// So the pulse is now the same geometry as the still rings: `Radar.ring` gives a real
+/// geodesic circle at the radius the pulse has reached, every point goes through the map's own
+/// projection, and the result is stroked as a path. Pitch, bearing and zoom are then the
+/// projection's problem, which it already solves exactly -- and the ring lies on the road at
+/// every angle, which is the whole thing Pokemon GO's does that makes it read as ground.
 struct RadarPulse: View {
     /// Where you are. The centre of everything here.
     var centre: CLLocationCoordinate2D
@@ -34,11 +49,24 @@ struct RadarPulse: View {
     /// saying the opposite of what is true.
     var discoverable: Bool
 
-    /// Three, staggered by a third of a cycle each, so the sweep is continuous rather than a
-    /// single ring you wait for.
+    /// Three, so the sweep is continuous rather than a single ring you wait for.
     private static let rings = 3
+
     /// Seconds for one ring to travel from your feet to the discovery edge.
-    private static let period: Double = 2.4
+    ///
+    /// 5.5 rather than 2.4. At the old rate a ring crossed 150 metres of ground every two
+    /// seconds, which is a scanner working hard at something; this is ambience, and the two
+    /// still rings underneath are what actually carry the distances. A slow sweep reads as a
+    /// place breathing, a fast one as a progress indicator.
+    private static let period: Double = 5.5
+
+    /// Where each ring sits in the cycle, as a fraction of it.
+    ///
+    /// Deliberately not thirds. Evenly spaced rings arrive on a beat, and three objects
+    /// arriving on a beat is a metronome -- the eye locks onto the rhythm and then the sweep
+    /// is a loading spinner rather than something the world is doing. Uneven gaps read as
+    /// unsynchronised, which is what `Motion`'s ambience section asks of every idle here.
+    private static let offsets: [Double] = [0, 0.41, 0.73]
 
     var body: some View {
         // Driven by a clock rather than by `withAnimation`, and that is a fix rather than a
@@ -58,23 +86,20 @@ struct RadarPulse: View {
                 // Reading `tick` is what re-measures the ellipse as the camera moves.
                 let _ = projection.tick
 
-                if discoverable, let shape = shape {
+                if discoverable {
                     let now = timeline.date.timeIntervalSinceReferenceDate
 
                     ZStack {
                         ForEach(0..<Self.rings, id: \.self) { index in
                             let phase = travel(at: now, ring: index)
 
-                            Ellipse()
-                                .stroke(.white, lineWidth: 3)
-                                .frame(width: shape.width, height: shape.height)
-                                // The frame is the destination, so 1 is the discovery edge.
-                                .scaleEffect(max(phase, 0.02))
-                                // Fades as it goes, and faster than it travels -- a ring that
-                                // is still bright when it arrives reads as a boundary being
-                                // drawn rather than as a signal that has run out of room.
-                                .opacity((1 - phase) * 0.85)
-                                .position(shape.centre)
+                            if let path = ring(atPhase: phase) {
+                                path.stroke(.white, lineWidth: 3)
+                                    // Fades as it goes, and faster than it travels -- a ring
+                                    // that is still bright when it arrives reads as a boundary
+                                    // being drawn rather than as a signal that ran out of room.
+                                    .opacity((1 - phase) * 0.85)
+                            }
                         }
                     }
                 }
@@ -90,60 +115,48 @@ struct RadarPulse: View {
     /// of information the sweep was carrying anyway.
     private func travel(at now: Double, ring: Int) -> Double {
         guard !Motion.reduceMotion else { return 1 }
-        let offset = Double(ring) / Double(Self.rings) * Self.period
+        let offset = Self.offsets[ring % Self.offsets.count] * Self.period
         return ((now + offset).truncatingRemainder(dividingBy: Self.period)) / Self.period
     }
 
-    /// The discovery ring as it actually lands on screen: centre, and the two semi-axes.
+    /// The sweep at one moment, as it lands on the road.
     ///
-    /// Nil before the map is up, and nil if the far edge projects to nonsense -- which happens
-    /// when the ring runs past the horizon at this pitch, and is the honest answer rather than
-    /// a guess.
-    private var shape: (centre: CGPoint, width: CGFloat, height: CGFloat)? {
+    /// Built from the same geodesic circle the still rings use, so a ring at 80 metres here
+    /// and the painted 80-metre ring underneath it are the same shape by construction rather
+    /// than by two pieces of code agreeing.
+    ///
+    /// Nil rather than clamped when any part of the circle runs past the horizon. A point
+    /// beyond the vanishing line projects to a coordinate thousands of points away, and
+    /// joining it to its neighbours draws a spike across the screen -- so the honest answer
+    /// for a ring that does not entirely fit on the ground is to skip that ring for a frame.
+    private func ring(atPhase phase: Double) -> Path? {
+        // Never zero. A circle of radius nothing is a point, and the first frames of a sweep
+        // should read as leaving the bear rather than as appearing on top of it.
+        let metres = max(phase * Radar.discoveryMetres, 2)
         guard let here = projection.point(for: centre) else { return nil }
 
-        let metres = Radar.discoveryMetres
-        // Degrees per metre. Longitude shrinks with latitude, which matters at the poles and
-        // is free to get right.
-        let north = metres / 111_320
-        let east = metres / (111_320 * max(cos(centre.latitude * .pi / 180), 0.01))
+        // How far off screen a point may land before the ring is judged to have run past the
+        // horizon. Generous, because most of a large ring is legitimately outside the frame
+        // under a raked camera; it is the runaway projections this is catching.
+        let limit: CGFloat = 4000
 
-        guard
-            let top = projection.point(for: .init(latitude: centre.latitude + north, longitude: centre.longitude)),
-            let bottom = projection.point(for: .init(latitude: centre.latitude - north, longitude: centre.longitude)),
-            let side = projection.point(for: .init(latitude: centre.latitude, longitude: centre.longitude + east))
-        else { return nil }
+        var path = Path()
+        var started = false
 
-        var height = abs(bottom.y - top.y)
-        var width = abs(side.x - here.x) * 2
-        guard height.isFinite, width.isFinite, height > 1, width > 1 else { return nil }
+        for coordinate in Radar.ring(around: centre, metres: metres, segments: 72) {
+            guard let point = projection.point(for: coordinate) else { return nil }
+            guard abs(point.x - here.x) < limit, abs(point.y - here.y) < limit else { return nil }
 
-        // Scaled down to something you can see, and this is the one place the sweep stops
-        // being true to the ground.
-        //
-        // At this zoom and pitch the real 150-metre ring is about 1100 points across on a
-        // 402-point screen, so a pulse drawn at true scale is a faint arc crossing the frame
-        // and leaving -- geometrically perfect and completely illegible. It reads as a
-        // rendering artefact rather than as a radar.
-        //
-        // The two rings that *are* on the ground already carry the real distances, and they
-        // are the ones anybody navigates by. This is a signal that something is scanning, so
-        // it is sized to be read. The aspect ratio and the centre stay measured, which is what
-        // keeps it lying flat instead of standing up in front of the bear.
-        let target: CGFloat = 300
-        if width > target {
-            height *= target / width
-            width = target
+            if started {
+                path.addLine(to: point)
+            } else {
+                path.move(to: point)
+                started = true
+            }
         }
 
-        // Centred on your feet, not on the true ellipse midpoint.
-        //
-        // The midpoint is the honest answer for a ring that is actually 150 metres across: at
-        // this pitch the far half compresses so much that the centre sits a long way up the
-        // screen, near the horizon. Once the size stopped being true to the ground -- see
-        // above -- keeping the centre true stopped being meaningful and started being wrong,
-        // because it drew a small ring floating in the distance rather than a sweep leaving
-        // the bear.
-        return (here, width, height)
+        guard started else { return nil }
+        path.closeSubpath()
+        return path
     }
 }

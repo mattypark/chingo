@@ -30,6 +30,38 @@ public enum Motion {
     /// The settle after the payoff. Bounce drains to nothing.
     public static let settle = Animation.spring(duration: 0.70, bounce: 0.10)
 
+    // MARK: Changing screens
+
+    /// The gap between one piece of chrome leaving and the next one following it.
+    ///
+    /// A screen change that moves everything at once is the system's transition, and it reads
+    /// as a page turning — one flat plane sliding over another. Staggering reads instead as
+    /// the objects on this screen leaving and different ones arriving, which is what a book of
+    /// stickers does when you turn it out.
+    ///
+    /// 0.05 rather than 0.1: at a tenth of a second per piece the last one is a third of a
+    /// second behind the first, and the screen reads as slow rather than as choreographed.
+    public static let stagger: Double = 0.05
+
+    /// How long the arriving screen waits for the one it is replacing to get out of the way.
+    ///
+    /// Shorter than the outgoing chrome takes to finish, deliberately. Waiting for a clean
+    /// hand-off reads as two separate events with a pause between them; overlapping slightly
+    /// reads as one screen pushing the other out.
+    public static let arrivalHold: Double = 0.16
+
+    /// When one piece of chrome starts moving during a swap between two screens.
+    ///
+    /// `rank` is its place within its own screen's chrome, counted in reading order. The
+    /// screen being left goes first, from zero; the screen arriving follows behind
+    /// `arrivalHold`, which is what stops both screens having chrome in the air at once.
+    ///
+    /// Pure, so the choreography can be checked without a simulator — the one thing about a
+    /// staggered transition that cannot be seen in a still.
+    public static func popDelay(rank: Int, arriving: Bool) -> Double {
+        (arriving ? arrivalHold : 0) + Double(max(0, rank)) * stagger
+    }
+
     // MARK: Ambience
     //
     // Idle life on the map. Long, unsynchronised, never demanding attention.
@@ -102,5 +134,30 @@ public extension View {
     @MainActor
     func reducedMotionSafe(_ animation: Animation) -> Animation? {
         Motion.reduceMotion ? nil : animation
+    }
+
+    /// One piece of chrome popping away, and popping back.
+    ///
+    /// It shrinks into itself rather than sliding off an edge, because everything on these
+    /// screens is a printed object stuck to the map: a sticker does not slide away, it comes
+    /// off. 0.86 and not smaller — past about 0.8 the shrink starts to read as a thing falling
+    /// backwards into the screen, which is a depth cue this flat language does not have.
+    ///
+    /// The direction is read from `hidden` at the moment it changes, so one modifier covers
+    /// both halves of a swap: leaving takes `Motion.dismiss` from rank zero, arriving takes
+    /// `Motion.arrive` from behind `Motion.arrivalHold`. Exits stay faster than entrances.
+    @MainActor
+    func pops(hidden: Bool, rank: Int) -> some View {
+        scaleEffect(hidden ? 0.86 : 1)
+            .opacity(hidden ? 0 : 1)
+            .allowsHitTesting(!hidden)
+            .animation(
+                Motion.reduceMotion
+                    ? nil
+                    : hidden
+                        ? Motion.dismiss.delay(Motion.popDelay(rank: rank, arriving: false))
+                        : Motion.arrive.delay(Motion.popDelay(rank: rank, arriving: true)),
+                value: hidden
+            )
     }
 }

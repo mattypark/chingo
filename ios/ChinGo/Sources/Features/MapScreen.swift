@@ -28,6 +28,9 @@ struct MapScreen: View {
     @State private var showCatch = false
     @State private var showAlbum = false
     @State private var showGlobe = false
+    /// Bumped by `-tour globe` to make the globe leave the way a thumb would. Always zero
+    /// outside a debug run.
+    @State private var globeLeaves = 0
     @State private var showAddFriend = false
     @State private var showMyHandle = false
     @State private var catchPulse = 0
@@ -66,6 +69,12 @@ struct MapScreen: View {
         return absolute - camera.bearing
     }
 
+    /// How far from a bear's middle a tap still counts as landing on it. Wider than the
+    /// character, because at this zoom a bear is about 44 points tall and a thumb is not
+    /// precise -- and the only thing a near miss can do is open the wrong card, which is one
+    /// tap to undo.
+    private static let tapReach: CGFloat = 46
+
     /// How many bears may be on screen before it stops being a map.
     ///
     /// Eight. Past that a lunchtime corner downtown is an unreadable pile and a battery
@@ -103,15 +112,52 @@ struct MapScreen: View {
     /// Somebody already revealed stays revealed until they pass `Radar.releaseMetres`, a third
     /// further out. Without that gap phone GPS drift alone flickers the card several times a
     /// minute for anybody standing near the boundary.
+    /// Who the card is open on, and it is only ever somebody you tapped.
+    ///
+    /// It used to open itself on whoever was nearest inside `interactionMetres`. That is one
+    /// step too eager: on a map whose whole job is to show you a street with people standing
+    /// on it, somebody is nearly always inside that radius, so a card was permanently parked
+    /// over the middle of the screen covering the thing it was pointing at. A card that is
+    /// always there is not a reveal, it is furniture.
+    ///
+    /// Proximity still decides who *can* be opened -- tapping a bear too far away does
+    /// nothing, and the ring on the ground is what says how far that is. Coming into range is
+    /// announced by the radar and by the rail down the right, both of which say "somebody is
+    /// here" without taking the screen to do it.
+    ///
+    /// Still released at `releaseMetres` rather than at `interactionMetres`: a card you opened
+    /// should not snap shut because GPS drifted five metres while you were reading it.
     private var revealed: NearbyPerson? {
-        if let held = revealedID,
-           let still = state.nearby.first(where: { $0.id == held }),
-           Double(still.approxMetres) <= Radar.releaseMetres {
-            return still
-        }
-        return state.nearby
-            .filter { Double($0.approxMetres) <= Radar.interactionMetres }
-            .min { $0.approxMetres < $1.approxMetres }
+        guard let held = revealedID,
+              let still = state.nearby.first(where: { $0.id == held }),
+              Double(still.approxMetres) <= Radar.releaseMetres
+        else { return nil }
+        return still
+    }
+
+    /// Whether tapping this person opens their card. The ring on the ground is this line.
+    private func canReveal(_ person: NearbyPerson) -> Bool {
+        Double(person.approxMetres) <= Radar.interactionMetres
+    }
+
+    /// Open the card on whichever bear was tapped, or close it if that was the street.
+    ///
+    /// Measured against the middle of each bear rather than the coordinate it stands on: a
+    /// bear is anchored at its feet, so hit-testing the coordinate means the tappable spot is
+    /// the ground under it and the character itself is not the target.
+    private func reveal(nearest point: CGPoint) {
+        let hit = state.nearby
+            .compactMap { person -> (person: NearbyPerson, distance: CGFloat)? in
+                guard canReveal(person), let foot = projection.point(for: person.coordinate) else { return nil }
+                let body = CGPoint(x: foot.x, y: foot.y - Self.bearHeight / 2)
+                let reach = hypot(body.x - point.x, body.y - point.y)
+                return reach <= Self.tapReach ? (person, reach) : nil
+            }
+            .min { $0.distance < $1.distance }
+
+        guard hit?.person.id != revealedID else { return }
+        if hit != nil { reveals += 1 }
+        withAnimation(Motion.surface) { revealedID = hit?.person.id }
     }
 
     /// The card, over the bear it belongs to.
@@ -146,16 +192,13 @@ struct MapScreen: View {
         // Reading `tick` is what re-runs this as the camera moves. Without it the card is
         // placed once and then sits still while the map slides underneath it.
         .id(projection.tick)
-        // `.arrive` rather than `.pick`. Somebody walking into range is a physical event, and
-        // `.pick` is the lightest thing in the vocabulary -- the same buzz a list row gets.
-        .feedback(.arrive, on: reveals)
-        .onChange(of: revealed?.id) { previous, next in
-            revealedID = next
-            // Only on entering an empty ring. Bumping this whenever the *nearest* person
-            // changes means walking between two people who are both already inside it buzzes
-            // you again, which is a notification about arithmetic rather than about anybody
-            // arriving.
-            if next != nil, previous == nil { reveals += 1 }
+        // `.pick` now, not `.arrive`. This card is opened by a thumb landing on a bear, which
+        // is exactly what `.pick` is for -- `.arrive` was right while the card opened itself
+        // at whoever walked into range, and that is no longer how it works.
+        .feedback(.pick, on: reveals)
+        // Clears the card when the person it belongs to walks out of range, and only then.
+        .onChange(of: revealed?.id) { _, next in
+            if next == nil { revealedID = nil }
         }
     }
 
@@ -263,6 +306,10 @@ struct MapScreen: View {
                         .onChanged { camera.pinch($0.magnification) }
                         .onEnded { _ in camera.endPinch() }
                 )
+                // Tap a bear to open their card; tap the street to put it away. Hit-tested
+                // here rather than on the map, because MapLibre's own recognisers are all
+                // switched off and its symbol layers cannot report a tap without them.
+                .onTapGesture { point in reveal(nearest: point) }
                 .ignoresSafeArea()
             // Above the map, below everything printed on it. The haze goes first: it is part
             // of the ground, and the sky has to be able to sit on top of where it ends.
@@ -296,7 +343,9 @@ struct MapScreen: View {
             )
 
             VStack(spacing: 0) {
-                topBar
+                // Each piece leaves on its own beat. This stack used to share one `.opacity`,
+                // which is why the whole thing could only ever fade as a single plane.
+                topBar.pops(hidden: showGlobe, rank: 0)
 
                 // Under the top bar rather than over the map's middle. It is an aside, and an
                 // aside that lands on top of where you are standing is not an aside.
@@ -313,15 +362,25 @@ struct MapScreen: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
+                // Equal gaps above and below, so the rail sits on the vertical middle of the
+                // right edge. That is where GOAT's level list sits and it is the arrangement
+                // this was lifted from; it only ever moved because the reveal card used to
+                // open itself over the top of it, and the card is opened by a tap now.
                 Spacer(minLength: Space.step)
+                // Always. The rail used to blank itself whenever somebody came close enough
+                // to photograph, on the reasoning that the card and the list answer the same
+                // question and the specific answer should win.
+                //
+                // That was wrong about which question the rail answers. The card says "this
+                // person, now"; the rail is the standing answer to "who is out" -- the one
+                // thing the map cannot say on its own, and the reason the right edge exists.
+                // In practice somebody is nearly always inside the reveal radius, so the list
+                // was hidden almost all the time and the screen read as having no names in it
+                // at all.
                 NearbyRail(people: state.nearby, focused: $focusedNearby)
-                    // The rail and the card answer the same question at different scales --
-                    // who is around, versus who is here. When somebody is close enough to
-                    // photograph, the specific answer wins and the list gets out of its way.
-                    .opacity(revealed == nil ? 1 : 0)
-                    .animation(.easeOut(duration: 0.18), value: revealed?.id)
+                    .pops(hidden: showGlobe, rank: 1)
                 Spacer(minLength: Space.step)
-                bottomBar
+                bottomBar.pops(hidden: showGlobe, rank: 2)
             }
             .padding(.horizontal, Space.inset)
             .padding(.bottom, Space.margin)
@@ -358,6 +417,18 @@ struct MapScreen: View {
                 }
                 .allowsHitTesting(false)
                 .ignoresSafeArea()
+            }
+
+            // The globe, in the map's stack rather than over it in a presentation.
+            //
+            // Built only while it is open, so MapKit and MapLibre are not both running a
+            // camera when nobody is looking at one of them. `Ink.ground` underneath it because
+            // the globe's own map fades in, and without an opaque floor the first frames of
+            // that fade are two maps at once.
+            if showGlobe {
+                GlobeScreen(onClose: { showGlobe = false }, leaveOn: globeLeaves)
+                    .background(Ink.ground.ignoresSafeArea())
+                    .zIndex(1)
             }
 
             if catchMenu {
@@ -451,6 +522,15 @@ struct MapScreen: View {
             case "globe": showGlobe = true
             default: break
             }
+
+            if DemoSeed.tour == "globe" {
+                try? await Task.sleep(for: .milliseconds(1600))
+                showGlobe = true
+                try? await Task.sleep(for: .milliseconds(2400))
+                // Through the screen's own way out rather than by flipping the flag, so what
+                // gets filmed is the exit a thumb would produce.
+                globeLeaves += 1
+            }
             #endif
         }
         .onChange(of: catches.count, initial: true) { _, _ in
@@ -499,9 +579,6 @@ struct MapScreen: View {
             MyHandleSheet()
                 .presentationDetents([.height(470)])
                 .presentationCornerRadius(30)
-        }
-        .fullScreenCover(isPresented: $showGlobe) {
-            GlobeScreen()
         }
         .sheet(isPresented: $showAlbum) {
             AlbumScreen()

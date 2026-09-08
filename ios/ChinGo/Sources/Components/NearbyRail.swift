@@ -7,9 +7,17 @@ import ChinGoDesign
 /// one focus position, the rest falling away above and below it. What is *not* lifted is how
 /// GOAT draws it -- there, focus is blur plus brightness, and both are banned here by name.
 ///
-/// So focus is carried by weight and size instead, at full opacity throughout. The chosen
-/// name is Bagel over a 3pt accent rule; its neighbours step down through `textSoft` to
-/// `textFaint`. Nothing fades, nothing blurs, and the list still has an obvious middle.
+/// So focus is carried by weight and size instead, at full opacity throughout. The chosen name
+/// is heavy and large over a 3pt accent rule; its neighbours step down in weight. Nothing
+/// fades, nothing blurs, and the list still has an obvious middle.
+///
+/// **SF Pro, not Bagel.** The names were set in Bagel from the day this was written, and it
+/// was wrong for the reason `DESIGN.md` already gives: Bagel is for numbers and two-word
+/// shouts, and anything you actually read is SF Pro. A column of names is read. At display
+/// weight over a park, with a hard cream offset behind each one to hold it off the green, the
+/// letterforms doubled and the whole rail looked embossed rather than printed -- so the shadow
+/// went with it. Weight holds the names off the park on its own; a plate behind them would be
+/// a translucent fill, which this language does not have.
 ///
 /// It exists because the map never said a single person was near you -- on an app whose whole
 /// premise is collecting the people you meet.
@@ -70,13 +78,8 @@ struct NearbyRail: View {
                 let distance = abs(index - clampedFocus)
 
                 Text(person.handle)
-                    .font(.custom(Typeface.bagel, size: size(at: distance)))
+                    .font(.system(size: size(at: distance), weight: weight(at: distance), design: .rounded))
                     .foregroundStyle(colour(at: distance))
-                    // A hard cream offset behind every name. The rail sits over a live map,
-                    // and ink on a park is not the same problem as ink on the cream ground.
-                    // This is the same trick as every other shadow in the app -- zero blur,
-                    // one offset -- doing the job a blurred halo would otherwise do.
-                    .shadow(color: Ink.ground, radius: 0, x: 2, y: 2)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .overlay(alignment: .bottom) {
@@ -99,14 +102,25 @@ struct NearbyRail: View {
         .accessibilityLabel("People near you")
     }
 
-    /// Bagel at three sizes. Chosen rather than interpolated: a continuous ramp would put
-    /// every row at its own arbitrary size, which is the uniformity the token sets exist to
-    /// prevent, one step removed.
+    /// Three sizes, chosen rather than interpolated: a continuous ramp would put every row at
+    /// its own arbitrary size, which is the uniformity the token sets exist to prevent, one
+    /// step removed.
     private func size(at distance: Int) -> CGFloat {
         switch distance {
-        case 0: 26
+        case 0: 24
         case 1: 18
-        default: 15
+        default: 16
+        }
+    }
+
+    /// Weight does most of the work now that the face is SF Pro. Bagel had one weight, so the
+    /// old ramp had to buy its hierarchy entirely with size, and the gap between 26 and 15 was
+    /// wide enough that the ends of the list read as a different control from the middle.
+    private func weight(at distance: Int) -> Font.Weight {
+        switch distance {
+        case 0: .heavy
+        case 1: .semibold
+        default: .medium
         }
     }
 
@@ -121,13 +135,16 @@ struct NearbyRail: View {
     /// purpose -- `approxMetres` is already rounded to the cell, and never a real distance to
     /// a real person.
     private var caption: some View {
+        // A step darker than the cream screens use. `textSoft` and `textFaint` are tuned
+        // against the paper ground, and over a park `textFaint` is very nearly the same value
+        // as the grass -- the count was there and unreadable, which is worse than absent.
         VStack(alignment: .trailing, spacing: 2) {
             Text(Distance.away(metres: listed[clampedFocus].approxMetres))
-                .font(.chinFootnote)
-                .foregroundStyle(Ink.textSoft)
+                .font(.chinCallout)
+                .foregroundStyle(Ink.text)
             Text(people.count == 1 ? "1 person near you" : "\(people.count) people near you")
                 .font(.chinFootnote)
-                .foregroundStyle(Ink.textFaint)
+                .foregroundStyle(Ink.textSoft)
         }
         .padding(.top, Space.tight)
         .contentTransition(.numericText())
@@ -138,9 +155,6 @@ struct NearbyRail: View {
         Text("Nobody out here yet.")
             .font(.chinHand)
             .foregroundStyle(Ink.textSoft)
-            // Same hard cream offset the names get. Gloria is a lighter face than Bagel and
-            // needs it more, not less, over a park.
-            .shadow(color: Ink.ground, radius: 0, x: 2, y: 2)
             .multilineTextAlignment(.trailing)
             // Narrow enough to wrap onto two short lines and stay hard against the right
             // edge. On one line it reaches back across the middle of the screen and lands on
