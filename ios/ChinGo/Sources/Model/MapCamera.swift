@@ -22,11 +22,13 @@ final class MapCamera {
     private(set) var pitch: CGFloat = 70
     /// How close in.
     ///
-    /// Deliberately above `CameraMath.defaultZoom`. At 17.2 you can see six blocks, which is
-    /// a navigation app's answer -- it tells you where you are in the city. This screen wants
-    /// the opposite: the street you are standing on, close enough that its name is readable
-    /// and the buildings on it have mass.
-    private(set) var zoom: Double = 18.4
+    /// Deliberately above `CameraMath.defaultZoom`, and now at the engine's ceiling. At 17.2
+    /// you can see six blocks, which is a navigation app's answer -- it tells you where you
+    /// are in the city. This screen wants the opposite: the street you are standing on.
+    ///
+    /// `CameraMath.zoomRange` stops at 19 and that range is the backend session's to widen.
+    /// Pokemon GO sits nearer 20; the request is in docs/HANDOFF-BACKEND.md.
+    private(set) var zoom: Double = 19
 
     /// True while the camera follows the direction of travel. A drag hands control to the
     /// user and it stays handed over until they explicitly ask for it back — a camera that
@@ -67,7 +69,10 @@ final class MapCamera {
     /// ask to be pushed back in, and a recentre that also re-zooms feels like being overruled.
     func recenter(course: CLLocationDirection?) {
         isFollowingCourse = true
-        pitch = 58
+        // Back to the opening rake, not to some other angle. This used to snap to 58 while
+        // the map opens at 70, so recentring quietly flattened the view and there was no way
+        // back to the angle the app starts at.
+        pitch = 70
         bearing = course ?? 0
     }
 

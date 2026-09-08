@@ -48,6 +48,16 @@ enum MapStyle {
         ]
     }
 
+    /// Bump on every change to any transform below.
+    ///
+    /// The painted style is cached per accent, and `url(for:)` returns the cached file without
+    /// looking inside it. So a transform change that keeps the same version is invisible --
+    /// the app serves the old style forever and it reads as the code having done nothing.
+    /// That has already cost one debugging session in this file. It is a named constant
+    /// rather than a literal buried in a filename so that changing a transform and forgetting
+    /// this are at least next to each other.
+    private static let styleVersion = 4
+
     /// A style file painted for this accent, written once and reused.
     static func url(for accent: Accent) -> URL? {
         guard let source = Bundle.main.url(forResource: "chingo-style", withExtension: "json") else {
@@ -56,7 +66,7 @@ enum MapStyle {
 
         let destination = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("chingo-style-\(accent.id)-v2.json")
+            .appendingPathComponent("chingo-style-\(accent.id)-v\(styleVersion).json")
 
         if FileManager.default.fileExists(atPath: destination.path) { return destination }
 
@@ -71,7 +81,7 @@ enum MapStyle {
         }
 
         let table = swaps(for: accent)
-        let painted = widenStreets(repaint(root, using: table))
+        let painted = shortenBuildings(widenStreets(repaint(root, using: table)))
 
         guard
             let out = try? JSONSerialization.data(withJSONObject: painted),
@@ -92,6 +102,67 @@ enum MapStyle {
     /// The colour the ground actually ends up. `MapScreen` paints this behind the map so the
     /// frame or two before tiles arrive is the same shade as the frame after.
     static func ground(for accent: Accent) -> Color { accent.washing(Ink.mapLand) }
+
+    // MARK: Buildings
+
+    /// The tallest a building may be when you are standing right in it, in metres.
+    ///
+    /// Roughly two storeys. Pokemon GO clamps building height for three reasons and all three
+    /// apply here: a real-height tower at a raked camera hides the ground, the player and the
+    /// reason to be looking at the screen; OpenStreetMap height data is wildly uneven, so one
+    /// clamp is the only thing that looks the same in Tokyo and in a small town; and uniform
+    /// low blocks read as a toy city while real heights read as a map. The toy read is the art
+    /// direction.
+    private static let closeCap: Double = 8
+
+    /// Zoom at which the clamp is fully off and the city is at its real height.
+    private static let uncappedZoom: Double = 16.5
+    /// Zoom at which the clamp is fully on.
+    private static let cappedZoom: Double = 19
+
+    /// Clamps `fill-extrusion-height` by zoom: short when you are in the street, full height
+    /// when you pull back.
+    ///
+    /// **Clamped, not scaled.** Multiplying every height by the same fraction flattens the
+    /// whole skyline uniformly and a cathedral ends up the same height as a corner shop.
+    /// `min(height, cap)` leaves everything under the cap alone, so at middle zooms the tall
+    /// things are still visibly taller -- it only takes the tops off the ones that were about
+    /// to fill the screen.
+    ///
+    /// **The zoom interpolate has to be the outermost expression.** MapLibre only accepts a
+    /// zoom expression at the top level of a property value, so this cannot be
+    /// `["min", height, <interpolate on zoom>]`. It has to be an interpolate whose *outputs*
+    /// are the data expressions.
+    ///
+    /// **`build-style.py:160` says that shape makes MapLibre silently drop the layer. It does
+    /// not, on 6.29.** That was tested here rather than believed, and the buildings render.
+    /// What *does* silently drop the whole layer is an **unrecognised paint key** -- adding
+    /// `fill-extrusion-rounded-roof` (which MapLibre iOS does not implement) made every
+    /// building in the city disappear with nothing in the log. That is almost certainly the
+    /// bug the original comment was describing, misattributed to the expression next to it.
+    /// Worth knowing before anyone spends another afternoon on it.
+    private static func shortenBuildings(_ root: Any) -> Any {
+        guard var document = root as? [String: Any],
+              let layers = document["layers"] as? [[String: Any]] else { return root }
+
+        document["layers"] = layers.map { layer -> [String: Any] in
+            guard layer["id"] as? String == "chingo-building-3d",
+                  var paint = layer["paint"] as? [String: Any],
+                  let full = paint["fill-extrusion-height"]
+            else { return layer }
+
+            paint["fill-extrusion-height"] = [
+                "interpolate", ["linear"], ["zoom"],
+                uncappedZoom, full,
+                cappedZoom, ["min", full, closeCap],
+            ] as [Any]
+
+            var shortened = layer
+            shortened["paint"] = paint
+            return shortened
+        }
+        return document
+    }
 
     /// How much wider the roads get.
     ///
