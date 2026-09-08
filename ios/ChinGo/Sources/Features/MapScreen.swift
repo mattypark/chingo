@@ -45,6 +45,10 @@ struct MapScreen: View {
     /// Who is currently revealed. Held rather than derived so it can hang on past the
     /// interaction radius -- see `revealed`.
     @State private var revealedID: String?
+    /// How far through being drawn the reveal card is. Driven by hand rather than by a
+    /// transition, because a transition can only fade or move a finished view -- and the whole
+    /// point here is that the card is not finished until it has been drawn.
+    @State private var cardDrawn: Drawn = .blank
     /// Bumped when somebody new comes into range, so the haptic fires on the crossing rather
     /// than on every frame they stay there.
     @State private var reveals = 0
@@ -176,13 +180,60 @@ struct MapScreen: View {
             .min { $0.distance < $1.distance }
 
         guard hit?.person.id != revealedID else { return }
-        if hit != nil { reveals += 1 }
-        withAnimation(Motion.surface) { revealedID = hit?.person.id }
+        guard let person = hit?.person else { return erase() }
+        open(person)
+    }
+
+    /// Draw the card on for somebody. Split from the hit test so `-tour reveal` can reach it:
+    /// simctl can launch a screen but cannot tap a bear on it, and a build-on animation that
+    /// only ever plays on a real tap is one nobody can look at from here.
+    private func open(_ person: NearbyPerson) {
+        reveals += 1
+        // Blank first, so a tap that moves the card from one bear to another redraws it there
+        // rather than sliding a finished card across the street.
+        cardDrawn = .blank
+        revealedID = person.id
+
+        guard !Motion.reduceMotion else { return cardDrawn = .complete }
+
+        Task { @MainActor in
+            // One frame later, and that is not a fudge. Inserting a view and animating it in
+            // the same transaction gives the animator no previous state to interpolate from,
+            // so the card arrives finished. Letting it be laid out blank first is what gives
+            // the draw somewhere to start.
+            try? await Task.sleep(for: .milliseconds(20))
+            withAnimation(Motion.draw) { cardDrawn = .complete }
+        }
+    }
+
+    /// The card leaves the way it arrived, backwards: the words go, the colour drains, the
+    /// outline retracts and the stem pulls back up. Faster than it was drawn, like every other
+    /// exit in the app.
+    private func erase() {
+        guard revealedID != nil else { return }
+        withAnimation(Motion.erase) { cardDrawn = .blank }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(340))
+            // Only if nothing has been tapped in the meantime, or this clears a card that was
+            // drawn while the erase was still running.
+            if cardDrawn.isBlank { revealedID = nil }
+        }
     }
 
     /// The card, over the bear it belongs to.
     private var revealLayer: some View {
         GeometryReader { geo in
+            // Reading `tick` is what re-places the card as the camera moves.
+            //
+            // Read as a value rather than hung on the layer as an `.id`, which is what it used
+            // to be. `MapProjection` is `@Observable`, so the read alone is enough to re-run
+            // this -- and the `.id` was doing something far worse than being redundant. It
+            // advances on *every rendered frame*, so it gave the card a new identity sixty
+            // times a second, and a view whose identity keeps changing cannot animate: the
+            // card snapped to finished instead of being drawn. `GlobeScreen.tokens` carries
+            // the same warning for the same reason.
+            let _ = projection.tick
+
             if let person = revealed, let point = projection.point(for: person.coordinate) {
                 // Nudged inboard only far enough to stay on screen, with the stem left
                 // pointing at the bear. An earlier version also kept it clear of the nearby
@@ -197,6 +248,7 @@ struct MapScreen: View {
                 RevealCard(
                     person: person,
                     stemOffset: point.x - x,
+                    drawn: cardDrawn,
                     onAdd: { showAddFriend = true },
                     onCatch: { showCatch = true }
                 )
@@ -209,9 +261,6 @@ struct MapScreen: View {
         // The map ignores the safe area and this has to be measured in the same space, or
         // every card lands a status bar's height below the bear it belongs to.
         .ignoresSafeArea()
-        // Reading `tick` is what re-runs this as the camera moves. Without it the card is
-        // placed once and then sits still while the map slides underneath it.
-        .id(projection.tick)
         // `.pick` now, not `.arrive`. This card is opened by a thumb landing on a bear, which
         // is exactly what `.pick` is for -- `.arrive` was right while the card opened itself
         // at whoever walked into range, and that is no longer how it works.
@@ -542,6 +591,13 @@ struct MapScreen: View {
             case "globe": showGlobe = true
             case "streak": showStreak = true
             default: break
+            }
+
+            if DemoSeed.tour == "reveal" {
+                try? await Task.sleep(for: .milliseconds(1500))
+                if let somebody = state.nearby.first(where: canReveal) { open(somebody) }
+                try? await Task.sleep(for: .milliseconds(2200))
+                erase()
             }
 
             if DemoSeed.tour == "globe" {

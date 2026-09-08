@@ -22,6 +22,8 @@ struct RevealCard: View {
     /// How far the bear sits from the middle of the card, once the card has been nudged away
     /// from the screen edge. The stem follows the bear; the card does not.
     var stemOffset: CGFloat = 0
+    /// How far through being drawn. See `ChinGoDesign.Drawn`.
+    var drawn: Drawn = .complete
     var onAdd: () -> Void
     var onCatch: () -> Void
 
@@ -43,13 +45,15 @@ struct RevealCard: View {
         }
         .frame(width: Self.width - Space.snug * 2)
         .padding(Space.snug)
-        .sticker(fill: Ink.groundRaised, radius: Radius.card)
+        // Drawn rather than faded in. The card is a printed thing, and a printed thing
+        // arrives by being made: the stem reaches down to the bear, the outline goes round,
+        // the colour floods it, and then the name and the buttons land on top.
+        .drawnSticker(fill: Ink.groundRaised, radius: Radius.card, drawn: drawn)
         // The stem ties the card to the bear rather than leaving it hovering over the street
-        // -- the same job the polaroid pins' stems already do.
+        // -- the same job the polaroid pins' stems already do. It draws first, downward, so
+        // the gesture starts at the card and reaches for the person.
         .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Ink.text)
-                .frame(width: 3, height: Self.stem)
+            DrawnStem(length: Self.stem, drawn: drawn)
                 // Clamped inside the rounded corners. A stem leaving from the very edge of a
                 // 20pt radius leaves from thin air.
                 .offset(x: min(max(stemOffset, -Self.width / 2 + 20), Self.width / 2 - 20), y: Self.stem)

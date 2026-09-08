@@ -30,6 +30,21 @@ public enum Motion {
     /// The settle after the payoff. Bounce drains to nothing.
     public static let settle = Animation.spring(duration: 0.70, bounce: 0.10)
 
+    // MARK: Being drawn
+    //
+    // See `Drawn`. These two are the only animations in the app that drive a single 0-to-1
+    // number through four overlapping beats, rather than moving or fading a finished view.
+
+    /// A thing drawing itself on. Long, because it is four beats and the middle one is a
+    /// stroke going round a whole box -- rushed, the effect collapses into a flash.
+    ///
+    /// No bounce. A drawn line does not overshoot and spring back; a hand stops where it
+    /// stops, and a springy outline reads as rubber rather than as ink.
+    public static let draw = Animation.easeInOut(duration: 0.62)
+
+    /// The same thing un-drawing. Faster, as every exit here is.
+    public static let erase = Animation.easeIn(duration: 0.32)
+
     // MARK: Changing screens
 
     /// The gap between one piece of chrome leaving and the next one following it.

@@ -166,7 +166,7 @@ enum DemoSeed {
         identity?.freezesLeft = MeRecord.freezeAllowance - 1
     }
 
-    /// `-tour globe` opens the globe a beat after launch and leaves again a beat later.
+    /// `-tour globe|reveal` drives a transition so it can be filmed.
     ///
     /// `-open globe` lands you inside it, which is the right flag for looking at the screen
     /// and the wrong one for looking at the way in: by the time anything is recorded the
