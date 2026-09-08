@@ -1,4 +1,5 @@
 #if DEBUG
+import CoreLocation
 import Foundation
 import SwiftData
 import ChinGoDesign
@@ -99,13 +100,30 @@ enum DemoSeed {
     @MainActor
     static func populate(_ state: MapState) {
         guard isRequested, state.nearby.isEmpty else { return }
-        state.nearby = [
-            NearbyPerson(id: "n-priya", handle: "priya", approxMetres: 40),
-            NearbyPerson(id: "n-sam", handle: "sam", approxMetres: 80),
-            NearbyPerson(id: "n-marcus", handle: "marcus", approxMetres: 120),
-            NearbyPerson(id: "n-dana", handle: "dana", approxMetres: 160),
-            NearbyPerson(id: "n-wren", handle: "wren", approxMetres: 200),
+        // Scattered around the fallback position at real metre offsets, each in a different
+        // colour and half of them walking, so the bear layer exercises tinting, idle, walk
+        // and depth sorting rather than five identical statues in a line.
+        let base = LocationService.fallback
+        let people: [(String, Int, Double, Double, Int, Double?)] = [
+            ("priya",   40,  0.00009,  0.00007, 6, 145),
+            ("sam",     80, -0.00013,  0.00011, 3, nil),
+            ("marcus", 120,  0.00016, -0.00014, 4, 20),
+            ("dana",   160, -0.00019, -0.00009, 1, nil),
+            ("wren",   200,  0.00006,  0.00019, 5, 300),
         ]
+        state.nearby = people.map { handle, metres, dLat, dLon, accent, course in
+            NearbyPerson(
+                id: "n-\(handle)",
+                handle: handle,
+                approxMetres: metres,
+                coordinate: CLLocationCoordinate2D(
+                    latitude: base.latitude + dLat,
+                    longitude: base.longitude + dLon
+                ),
+                accent: accent,
+                course: course
+            )
+        }
     }
 
     static func populate(_ context: ModelContext) {

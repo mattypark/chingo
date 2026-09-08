@@ -31,6 +31,9 @@ struct MapScreen: View {
     @State private var catchPulse = 0
     /// Which name in the nearby rail is in focus.
     @State private var focusedNearby = 0
+    /// Which step of the walk every bear is on. One counter for everybody: a crowd all
+    /// stepping in time is a marching band, so each bear offsets from it by its own id.
+    @State private var walkPhase = 0
     /// The photo currently flying into the album, if any.
     @State private var flying: UIImage?
     @State private var flown = false
@@ -46,6 +49,33 @@ struct MapScreen: View {
         guard abs(dLon) > 1e-9 || abs(dLat) > 1e-9 else { return nil }
         let absolute = atan2(dLon, dLat) * 180 / .pi
         return absolute - camera.bearing
+    }
+
+    /// How many bears may be on screen before it stops being a map.
+    ///
+    /// Eight. Past that a lunchtime corner downtown is an unreadable pile and a battery
+    /// complaint, and the people beyond the cap are not lost -- they are still in the rail
+    /// and still in the nearby list.
+    private static let visibleBears = 8
+
+    /// Everyone near enough to draw, nearest first.
+    private var bears: [BearMark] {
+        state.nearby
+            .sorted { $0.approxMetres < $1.approxMetres }
+            .prefix(Self.visibleBears)
+            .map { person in
+                BearMark(
+                    id: person.id,
+                    coordinate: person.coordinate,
+                    icon: BearIcons.name(
+                        accent: person.accent,
+                        // Standing still is an idle, not a frozen walk frame.
+                        phase: person.course == nil
+                            ? nil
+                            : walkPhase + abs(person.id.hashValue % BearIcons.walkFrames)
+                    )
+                )
+            }
     }
 
     private var here: (lat: Double, lon: Double) {
@@ -74,7 +104,8 @@ struct MapScreen: View {
                 coordinate: location.coordinateOrFallback,
                 bearing: camera.bearing,
                 pitch: camera.pitch,
-                zoom: camera.zoom
+                zoom: camera.zoom,
+                bears: bears
             )
             .ignoresSafeArea()
 
@@ -191,6 +222,15 @@ struct MapScreen: View {
             }
         }
         .background(MapStyle.ground(for: accent))
+        .task {
+            // Ten a second, not sixty. A walk cycle wants eight to twelve frames a second
+            // anyway, and the slight stagger of a low frame rate suits a drawn character
+            // better than smooth interpolation would.
+            while !Task.isCancelled {
+                if !Motion.reduceMotion { walkPhase += 1 }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
         .task {
             // Deliberately does NOT request permission. The map is built underneath
             // onboarding from the first frame, so asking here fires the system alert before

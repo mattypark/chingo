@@ -34,6 +34,9 @@ struct MapLibreMap: UIViewRepresentable {
     /// hand is how a camera ends up either underground or looking at the whole planet.
     var zoom: Double
 
+    /// Everyone with a bear on the map, nearest last so the draw order is already right.
+    var bears: [BearMark] = []
+
     func makeUIView(context: Context) -> MLNMapView {
         // Not the bundled file directly: MapStyle corrects the palette the generated style
         // drifted from and washes the neutral family toward the player's accent.
@@ -110,9 +113,69 @@ struct MapLibreMap: UIViewRepresentable {
         /// clobbers the camera, so it happens only when the colour genuinely changed.
         var paintedAccent: Int?
 
+        /// The source the bear layers read. Held so `updateUIView` can push new positions
+        /// without rebuilding the layers.
+        var bearSource: MLNShapeSource?
+
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
-            guard let aim else { return }
-            mapView.setCamera(aim(mapView), animated: false)
+            installBearLayers(into: style)
+            if let aim { mapView.setCamera(aim(mapView), animated: false) }
+        }
+
+        /// Two symbol layers: a shadow lying on the road, and a bear standing up off it.
+        ///
+        /// Rendered by MapLibre rather than as a SwiftUI overlay, and that is the whole
+        /// design. Inside the map's own frame there is no projection to synchronise and no
+        /// second renderer to fall a frame behind, so the bears cannot swim against the map
+        /// during a pan. It also hands over two things for free that would otherwise be work:
+        /// upright billboarding on a pitched camera, and correct depth sorting between bears.
+        func installBearLayers(into style: MLNStyle) {
+            for (name, image) in BearIcons.all {
+                style.setImage(image, forName: name)
+            }
+
+            let source = MLNShapeSource(identifier: "bears", shape: nil, options: nil)
+            style.addSource(source)
+            bearSource = source
+
+            // The shadow is pitch-aligned to the *map*, so it lies flat on the road. The bear
+            // is aligned to the viewport, so it stands up and faces you. That split is what
+            // sells a flat image as something standing in the world, and it is the single
+            // highest-value line in this file.
+            let shadow = MLNSymbolStyleLayer(identifier: "bear-shadows", source: source)
+            shadow.iconImageName = NSExpression(forConstantValue: BearIcons.shadowName)
+            shadow.iconPitchAlignment = NSExpression(forConstantValue: "map")
+            shadow.iconRotationAlignment = NSExpression(forConstantValue: "map")
+            shadow.iconAnchor = NSExpression(forConstantValue: "center")
+            shadow.iconAllowsOverlap = NSExpression(forConstantValue: true)
+            shadow.iconScale = iconScale(0.105)
+            style.addLayer(shadow)
+
+            let bear = MLNSymbolStyleLayer(identifier: "bear-avatars", source: source)
+            bear.iconImageName = NSExpression(forKeyPath: "icon")
+            bear.iconPitchAlignment = NSExpression(forConstantValue: "viewport")
+            bear.iconRotationAlignment = NSExpression(forConstantValue: "viewport")
+            // Feet on the coordinate, not the middle of the body.
+            bear.iconAnchor = NSExpression(forConstantValue: "bottom")
+            bear.iconAllowsOverlap = NSExpression(forConstantValue: true)
+            // Painter's algorithm by screen Y, so a nearer bear covers a further one without
+            // anybody sorting anything.
+            bear.symbolZOrder = NSExpression(forConstantValue: "viewport-y")
+            bear.iconScale = iconScale(0.17)
+            style.addLayer(bear)
+        }
+
+        /// Keeps a bear the same size in the world rather than the same size on screen, so
+        /// walking away from someone makes them smaller.
+        ///
+        /// The numbers look small because the icons are rendered at device scale -- a 192pt
+        /// bear is 576 actual pixels on a 3x phone, and MapLibre scales the pixels. Tuned by
+        /// looking at it: the first pass put a bear a quarter of the screen tall.
+        private func iconScale(_ base: Double) -> NSExpression {
+            NSExpression(
+                format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'exponential', 2, %@)",
+                [16: base * 0.35, 19: base]
+            )
         }
     }
 
@@ -120,6 +183,15 @@ struct MapLibreMap: UIViewRepresentable {
         let lastZoom = context.coordinator.lastZoom
         context.coordinator.lastZoom = zoom
         context.coordinator.aim = { map in camera(for: map, heading: bearing) }
+
+        context.coordinator.bearSource?.shape = MLNShapeCollectionFeature(
+            shapes: bears.map { mark in
+                let point = MLNPointFeature()
+                point.coordinate = mark.coordinate
+                point.attributes = ["icon": mark.icon]
+                return point
+            }
+        )
 
         if context.coordinator.paintedAccent != accent.id {
             context.coordinator.paintedAccent = accent.id
@@ -153,5 +225,25 @@ struct MapLibreMap: UIViewRepresentable {
             pitch: pitch,
             heading: heading
         )
+    }
+}
+
+
+/// One bear, ready to draw.
+///
+/// Deliberately not `NearbyPerson`: this is the render-side shape, and keeping it separate
+/// means the walk phase can tick at ten times a second without anything believing a person's
+/// identity changed.
+struct BearMark: Equatable {
+    let id: String
+    let coordinate: CLLocationCoordinate2D
+    let icon: String
+
+    // CLLocationCoordinate2D is not Equatable, so there is no synthesised conformance to have.
+    static func == (a: BearMark, b: BearMark) -> Bool {
+        a.id == b.id
+            && a.icon == b.icon
+            && a.coordinate.latitude == b.coordinate.latitude
+            && a.coordinate.longitude == b.coordinate.longitude
     }
 }

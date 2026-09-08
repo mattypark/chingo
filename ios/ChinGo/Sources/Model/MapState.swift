@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import Observation
 import ChinGoEngine
@@ -70,4 +71,41 @@ struct NearbyPerson: Identifiable, Hashable {
     let handle: String
     /// Metres, already coarsened to the cell. Never a precise distance to a person.
     let approxMetres: Int
+
+    /// Where their bear stands.
+    ///
+    /// Live only. This is the field that changes the privacy model -- `Presence.swift` said
+    /// precise position is never exposed, and drawing somebody standing on a street is
+    /// exactly that. It is deliberate, it is limited to the public server while both people
+    /// are discoverable, and nothing about it is written down. The contract and the argument
+    /// are in docs/HANDOFF-BACKEND.md; the engine's rule is the backend session's to rewrite.
+    let coordinate: CLLocationCoordinate2D
+    /// Their bear's colour, as an index into `Accent.all`. Never a hex -- a colour saved in a
+    /// database survives a rebrand it should not.
+    let accent: Int
+    /// Which way they are walking, or nil when standing still. Drives idle versus walk.
+    let course: CLLocationDirection?
+    /// Their picture, if they set one. Nil is the common case and means show the bear.
+    let portraitFile: String?
+
+    init(
+        id: String,
+        handle: String,
+        approxMetres: Int,
+        coordinate: CLLocationCoordinate2D,
+        accent: Int = 0,
+        course: CLLocationDirection? = nil,
+        portraitFile: String? = nil
+    ) {
+        self.id = id
+        self.handle = handle
+        self.approxMetres = approxMetres
+        self.coordinate = coordinate
+        self.accent = accent
+        self.course = course
+        self.portraitFile = portraitFile
+    }
+
+    static func == (a: NearbyPerson, b: NearbyPerson) -> Bool { a.id == b.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
