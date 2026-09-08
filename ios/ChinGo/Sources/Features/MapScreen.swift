@@ -88,8 +88,8 @@ struct MapScreen: View {
 
     /// Roughly how tall a bear stands on screen, in points, at the zoom the map sits at.
     /// Measured off the icon rather than derived: `BearIcons.side` is 192pt and the symbol
-    /// layer scales it to about 12% at zoom 18.
-    private static let bearHeight: CGFloat = 24
+    /// layer scales it to about 15% at the zoom the map opens on.
+    private static let bearHeight: CGFloat = 28
 
     /// The nearest person inside the interaction ring, with hysteresis.
     ///

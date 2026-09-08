@@ -28,16 +28,28 @@ final class MapCamera {
     ///
     /// As far in as the screen can go and still show what the screen is for.
     ///
-    /// Two things set this, and they agree. Going further in was tried at 20.4 and looks
-    /// broken without being broken: you see about forty metres of ground, which on a downtown
-    /// block is entirely block interior, so the whole screen goes flat green and the roads are
-    /// off the edge. And the radar rings are 80 and 150 metres across -- at 19 the inner one
-    /// is already wider than the screen, so the boundary you are meant to judge distance by
-    /// cannot be seen at all.
+    /// This used to be 18.2, held there by two things. Going further in was tried at 20.4 and
+    /// looked broken without being broken: you see about forty metres of ground, which on a
+    /// downtown block is entirely block interior, so the whole screen went flat and the roads
+    /// were off the edge. And the radar rings are 80 and 150 metres across, so past about 19
+    /// neither fits on screen as a circle.
     ///
-    /// The street grid and the rings are the two things that make this read as a game map
-    /// rather than a lawn, and 18.2 is the closest in where both survive.
-    private(set) var zoom: Double = 18.2
+    /// The first has stopped being true: the roads are 2.6x their navigation width now, so
+    /// there is street on screen at zooms where there used not to be. The second still holds,
+    /// and this trades it away deliberately. Past about 19 a ring stops being a circle you can
+    /// see and becomes an arc crossing the ground, which still reads as a boundary -- and the
+    /// interaction ring was never the real signal for crossing it anyway. A card appearing
+    /// over somebody's head is.
+    ///
+    /// Lighting the ground inside the discovery ring was tried as a way to keep "am I inside
+    /// it" legible without the whole circle. It does not work at this zoom for the reason the
+    /// zoom is the problem: the entire visible frame is inside the ring, so the fill has no
+    /// edge in it and only washes the palette out.
+    ///
+    /// So: forty metres is still too far -- at 20 the frame is one intersection and nothing
+    /// else -- but 18.8 gives about fifty-five metres across, which is your street and the
+    /// corners at either end of it.
+    private(set) var zoom: Double = 18.8
 
     /// True while the camera follows the direction of travel. A drag hands control to the
     /// user and it stays handed over until they explicitly ask for it back — a camera that
