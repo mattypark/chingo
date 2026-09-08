@@ -22,7 +22,9 @@ print or commit a credential.
 
 Commit after every change. Never push unless asked.
 
-Current state: 45 engine tests (83 across both packages), 21 RLS assertions and 13 worker tests pass. Build 0.1.0 (3) is on
+Current state: 45 engine tests (83 across both packages), 23 RLS assertions, 13 worker tests and
+an 11-check end-to-end presence smoke test pass. The whole backend runs locally for free:
+./scripts/dev-backend.sh, then node scripts/smoke-presence.mjs (docs/LOCAL-BACKEND.md). Build 0.1.0 (3) is on
 TestFlight and VALID. The internal group "Team" and the external group "Friends & Family"
 both exist, the privacy policy is live at
 https://mattypark.github.io/chingo/site/privacy.html, and What to Test is written. External

@@ -119,3 +119,11 @@ grant execute on function public.delete_me()                     to authenticate
 -- Service role only. See the comment on the function.
 revoke execute on function public.block_relations_for(uuid)      from public, anon, authenticated;
 grant  execute on function public.block_relations_for(uuid)      to service_role;
+
+-- The presence worker holds the service key, and this is the whole of what it may do
+-- with it: read a profile to learn the handle, the accent, and whether the person is
+-- discoverable and onboarded. Not write one. 0002 deliberately granted service_role
+-- nothing at all, and this is the one exception -- a leaked service key should be able
+-- to read profiles, not rewrite them.
+grant usage  on schema public       to service_role;
+grant select on public.profiles     to service_role;

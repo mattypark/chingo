@@ -254,6 +254,30 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- As the presence worker (service role): read a profile, and nothing more
+-- ---------------------------------------------------------------------------
+set local role service_role;
+
+do $$
+declare n integer;
+begin
+  -- 16. The worker learns handle, accent and discoverability. That is its job.
+  select count(*) into n from public.profiles where id = 'aaaaaaaa-0000-4000-8000-000000000001';
+  if n <> 1 then raise exception 'FAIL: the server could not read a profile'; end if;
+  raise notice 'PASS: the server may read a profile';
+
+  -- 17. It may not write one. A leaked service key reads; it does not rewrite people.
+  begin
+    update public.profiles set handle = 'pwned' where id = 'aaaaaaaa-0000-4000-8000-000000000001';
+    raise exception 'FAIL: the server rewrote a profile';
+  exception when insufficient_privilege then
+    raise notice 'PASS: the server may not write a profile';
+  end;
+end $$;
+
+reset role;
+
+-- ---------------------------------------------------------------------------
 -- Bond symmetry: the schema makes a one-sided friendship unrepresentable.
 -- ---------------------------------------------------------------------------
 reset role;

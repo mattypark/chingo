@@ -1,0 +1,10 @@
+// The build settings the app reads its backend from. Committed, and empty on purpose.
+//
+// Values come from Secrets.xcconfig, which is gitignored. The ? makes the include optional:
+// with no such file, these stay empty, Info.plist gets empty strings, and the app runs on
+// seeded local data -- a working state, not a broken one.
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+TILE_BASE_URL =
+
+#include? "Secrets.xcconfig"

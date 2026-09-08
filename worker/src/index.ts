@@ -44,10 +44,20 @@ async function blocksFor(uid: string, env: Env): Promise<string[]> {
   return rows.map((r) => (typeof r === "string" ? r : r.block_relations_for));
 }
 
-function bearer(request: Request): string | null {
+/**
+ * The token comes either as `Authorization: Bearer` or as the WebSocket subprotocol
+ * `bearer.<jwt>`. Browsers and Node's WebSocket cannot set headers on an upgrade, and a
+ * token in the query string ends up in access logs; the subprotocol is the standard
+ * workaround and every client can send it.
+ */
+function bearer(request: Request): { token: string; protocol: string | null } | null {
   const header = request.headers.get("Authorization") ?? "";
-  const match = /^Bearer\s+(.+)$/i.exec(header);
-  return match?.[1] ?? null;
+  const fromHeader = /^Bearer\s+(.+)$/i.exec(header)?.[1];
+  if (fromHeader) return { token: fromHeader, protocol: null };
+  const protocols = (request.headers.get("Sec-WebSocket-Protocol") ?? "").split(",").map((s) => s.trim());
+  const proto = protocols.find((s) => s.startsWith("bearer."));
+  if (proto) return { token: proto.slice("bearer.".length), protocol: proto };
+  return null;
 }
 
 export default {
@@ -60,11 +70,11 @@ export default {
       return new Response("expected websocket", { status: 426 });
     }
 
-    const token = bearer(request);
-    if (!token) return new Response("unauthorized", { status: 401 });
+    const auth = bearer(request);
+    if (!auth) return new Response("unauthorized", { status: 401 });
     let sub: string;
     try {
-      ({ sub } = await verifySupabaseJwt(token, env));
+      ({ sub } = await verifySupabaseJwt(auth.token, env));
     } catch {
       return new Response("unauthorized", { status: 401 });
     }
@@ -92,6 +102,8 @@ export default {
         "X-Lat": String(lat),
         "X-Lon": String(lon),
         "X-Blocks": JSON.stringify(blocks),
+        // Echoed on the 101 so a client that offered a subprotocol sees it accepted.
+        ...(auth.protocol ? { "X-Protocol": auth.protocol } : {}),
       },
     });
     return stub.fetch(handoff);

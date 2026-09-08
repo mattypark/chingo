@@ -21,10 +21,18 @@ targets:
     platform: iOS
     sources:
       - path: ChinGo
-      # Documents the real Secrets.xcconfig, which is gitignored. It has no business
-      # shipping inside the app bundle.
-      - path: ChinGo/Secrets.xcconfig.example
-        buildPhase: none
+        excludes:
+          # Neither belongs in the bundle. The real one is gitignored; the example is
+          # documentation. Both are reached through Base.xcconfig below, not copied.
+          - Secrets.xcconfig
+          - Secrets.xcconfig.example
+          - Base.xcconfig
+    # Base.xcconfig does `#include? "Secrets.xcconfig"` -- the ? makes a missing file a
+    # no-op rather than a build error, so a fresh checkout builds with empty values and
+    # the app runs on seeded local data. scripts/dev-backend.sh writes the real one.
+    configFiles:
+      Debug: ChinGo/Base.xcconfig
+      Release: ChinGo/Base.xcconfig
     dependencies:
       - package: ChinGoDesign
       - package: ChinGoDesign

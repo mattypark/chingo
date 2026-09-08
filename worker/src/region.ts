@@ -94,7 +94,12 @@ export class Region extends DurableObject<Env> {
     // which nobody has judged yet.
     await this.refreshCell(cellId(lat, lon));
     await this.refreshPairs(server, member);
-    return new Response(null, { status: 101, webSocket: client });
+    const protocol = request.headers.get("X-Protocol");
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+      headers: protocol ? { "Sec-WebSocket-Protocol": protocol } : {},
+    });
   }
 
   // -- messages --------------------------------------------------------------------------
@@ -143,25 +148,34 @@ export class Region extends DurableObject<Env> {
   }
 
   private async leave(ws: WebSocket): Promise<void> {
-    const me = ws.deserializeAttachment() as Member | null;
+    // Read the attachment before anything else: on a socket the peer has already closed,
+    // the runtime may refuse the read, and a leaver whose row cannot be read must still
+    // not stay drawn on everyone else's map.
+    let me: Member | null = null;
+    try {
+      me = ws.deserializeAttachment() as Member | null;
+    } catch {
+      me = null;
+    }
+    const leavingTag = this.ctx.getTags(ws)[0] ?? me?.uid;
     try {
       ws.close(1000);
     } catch {
       // Already closed; that is the point.
     }
-    if (!me) return;
+    if (!leavingTag) return;
     // Told to everyone regardless of what memory thinks they were shown. A client ignores a
     // `gone` for a bear it was not drawing; a bear left drawn after its person left is the
     // failure that matters.
     for (const [other] of this.members()) {
       if (other === ws) continue;
-      this.send(other, { t: "gone", id: me.uid });
+      this.send(other, { t: "gone", id: leavingTag });
     }
-    this.visible.delete(me.uid);
-    this.blocks.delete(me.uid);
-    await this.ctx.storage.delete(`blocks:${me.uid}`);
+    this.visible.delete(leavingTag);
+    this.blocks.delete(leavingTag);
+    await this.ctx.storage.delete(`blocks:${leavingTag}`);
     // Leaving can drop a cell below the floor for everyone still in it.
-    await this.refreshCell(cellId(me.lat, me.lon));
+    if (me) await this.refreshCell(cellId(me.lat, me.lon));
   }
 
   // -- the sweep -------------------------------------------------------------------------
@@ -185,7 +199,13 @@ export class Region extends DurableObject<Env> {
   private members(): Array<[WebSocket, Member]> {
     const out: Array<[WebSocket, Member]> = [];
     for (const ws of this.ctx.getWebSockets()) {
-      const m = ws.deserializeAttachment() as Member | null;
+      if (ws.readyState !== WebSocket.READY_STATE_OPEN) continue;
+      let m: Member | null = null;
+      try {
+        m = ws.deserializeAttachment() as Member | null;
+      } catch {
+        continue;
+      }
       if (m) out.push([ws, m]);
     }
     return out;
