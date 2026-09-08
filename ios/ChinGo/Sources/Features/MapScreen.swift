@@ -239,6 +239,11 @@ struct MapScreen: View {
             // permission is already there.
             location.start()
             #if DEBUG
+            // Put the demo people around wherever the map actually opened, not around the
+            // hardcoded fallback -- otherwise they are always in Dolores Park.
+            DemoSeed.populate(state, around: location.coordinateOrFallback)
+            #endif
+            #if DEBUG
             switch DemoSeed.opens {
             case "album": showAlbum = true
             case "profile": showProfile = true

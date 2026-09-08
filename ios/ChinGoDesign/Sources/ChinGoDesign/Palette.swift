@@ -55,20 +55,34 @@ public enum Ink {
 
     // MARK: Map
     //
-    // Exported to worker/style/chingo.json. Flat fills, no gradients: a basemap with
-    // texture fights the cards that sit on top of it.
+    // Green ground, dark road ribbons, no buildings. This is a deliberate break from the warm
+    // paper the rest of the app is made of, and the reason is that the map is not paper --
+    // it is the ground you are standing on, and the chrome floating over it is the paper.
+    // Cream cards on a green field separate cleanly; cream cards on a cream field needed a
+    // shadow to exist at all.
+    //
+    // Exported to worker/style/chingo.json, and corrected on the way in by `MapStyle` while
+    // the generator still emits the old palette.
 
-    public static let mapLand = Color(hex: 0xEDE7D6)
-    public static let mapPark = Color(hex: 0xCFE0BC)
-    public static let mapWater = Color(hex: 0xA8D8D0)
-    public static let mapRoad = Color(hex: 0xFFFDF7)
-    public static let mapRoadCasing = Color(hex: 0xDDD5C2)
-    public static let mapBuilding = Color(hex: 0xE4DCC8)
-    /// A minority of blocks, so a neighbourhood is not one flat tone.
-    public static let mapBuildingWarm = Color(hex: 0xDCCFB4)
-    /// The extruded side face. Buildings are drawn as a top over a darker side; without
-    /// this the map is a diagram rather than a place.
-    public static let mapBuildingSide = Color(hex: 0xC6B99C)
+    /// The ground. Everything that is not water, park or road.
+    public static let mapLand = Color(hex: 0x6FCB79)
+    /// Parks and grass -- a deeper green, so a park still reads as a park against ground that
+    /// is already green rather than disappearing into it.
+    public static let mapPark = Color(hex: 0x4FB162)
+    public static let mapWater = Color(hex: 0x56C2DC)
+    /// The carriageway. Dark and desaturated: on a green field the road is the one thing that
+    /// has to stay legible while walking, and a light road on light green does not.
+    public static let mapRoad = Color(hex: 0x4E6157)
+    /// The edge of the ribbon. Darker than the fill rather than lighter, so a road reads as a
+    /// solid object laid on the grass instead of an outline drawn on it.
+    public static let mapRoadCasing = Color(hex: 0x39493F)
+
+    // Buildings are no longer drawn -- `MapStyle.removeBuildings` strips the layers. These
+    // stay because the generated style still contains the colours and the correction table
+    // still has to name something to map them to.
+    public static let mapBuilding = Color(hex: 0x64C070)
+    public static let mapBuildingWarm = Color(hex: 0x5CB868)
+    public static let mapBuildingSide = Color(hex: 0x4AA458)
 
     // MARK: Depth
     //

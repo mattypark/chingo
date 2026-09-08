@@ -97,13 +97,19 @@ enum DemoSeed {
     ///
     /// `MapState.nearby` stays empty until the backend wires real presence, so without this
     /// the rail has nothing to draw and cannot be looked at. Same flag, same idempotence.
+    /// `around` re-places them at wherever the map actually opened.
+    ///
+    /// Seeding against `LocationService.fallback` alone means the demo people sit in Dolores
+    /// Park no matter where the simulator is pointed, so testing anywhere else shows an empty
+    /// street. Called again once a real coordinate arrives.
     @MainActor
-    static func populate(_ state: MapState) {
-        guard isRequested, state.nearby.isEmpty else { return }
+    static func populate(_ state: MapState, around: CLLocationCoordinate2D? = nil) {
+        guard isRequested else { return }
+        guard state.nearby.isEmpty || around != nil else { return }
         // Scattered around the fallback position at real metre offsets, each in a different
         // colour and half of them walking, so the bear layer exercises tinting, idle, walk
         // and depth sorting rather than five identical statues in a line.
-        let base = LocationService.fallback
+        let base = around ?? LocationService.fallback
         let people: [(String, Int, Double, Double, Int, Double?)] = [
             ("priya",   40,  0.00009,  0.00007, 6, 145),
             ("sam",     80, -0.00013,  0.00011, 3, nil),

@@ -50,7 +50,7 @@ struct SkyBand: View {
                     .frame(height: geo.size.height * Self.reach)
                     .mask { horizonMask }
 
-                Clouds(bearing: bearing, reach: Self.reach, tint: band.high)
+                Clouds(bearing: bearing, tint: band.high)
                     .frame(height: geo.size.height * Self.reach)
                     // The same horizon the gradient uses. Without it the low deck drifts on
                     // past the skyline and ends up as pale blobs lying across the street,

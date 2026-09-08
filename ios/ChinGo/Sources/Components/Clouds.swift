@@ -77,8 +77,6 @@ struct Clouds: View {
     }
 
     var bearing: Double
-    /// How much of the screen height the sky band covers.
-    var reach: CGFloat
     /// Sky colour, so clouds sit in the weather rather than on top of it.
     var tint: Color
 
@@ -92,13 +90,35 @@ struct Clouds: View {
                         deckView(deck, minutes: minutes, size: geo.size)
                     }
                 }
+                // Feathered at the left and right edges as well as the horizon. A cloud that
+                // simply stops at the screen edge reads as a torn sticker; one that thins out
+                // reads as weather continuing past the frame.
+                .mask {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .black, location: 0.06),
+                            .init(color: .black, location: 0.94),
+                            .init(color: .clear, location: 1),
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                }
+                // Clipped back to the screen only after the mask, so the overdrawn copies
+                // either side stay available to the feather instead of being cut first.
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                .clipped()
             }
         }
         .allowsHitTesting(false)
     }
 
     private func deckView(_ deck: Deck, minutes: Double, size: CGSize) -> some View {
-        let band = size.height * reach
+        // The caller sizes this view to the sky band already. Multiplying by the reach again
+        // here squeezed every deck into the top third of the band and clipped them out of
+        // sight entirely.
+        let band = size.height
         // Drift plus sway. Wrapped to one screen width so the tiling never runs out.
         let travelled = minutes * deck.speed + bearing / 360 * deck.sway
         let offset = -CGFloat(travelled.truncatingRemainder(dividingBy: 1)) * size.width
@@ -106,16 +126,25 @@ struct Clouds: View {
         // The canvas fills the whole band and the deck's altitude is applied to each puff
         // inside it. Giving each deck its own short frame clipped the puffs into a hard
         // horizontal line across the sky -- a seam where there should be weather.
+        // Three copies, one screen apart, drawn into a canvas a screen wider than the screen
+        // and offset back by half of that. A cloud crossing the edge is then always drawn
+        // whole by the neighbouring copy instead of being sliced by the canvas bounds -- which
+        // is what produced the straight vertical cut through a cloud at the edge of the map.
         return Canvas { context, canvasSize in
-            // Two copies, one screen apart, so the horizontal wrap is always off-screen.
-            for pass in 0...1 {
-                context.translateBy(x: pass == 0 ? 0 : canvasSize.width, y: 0)
-                draw(deck, in: &context, size: canvasSize)
-                context.translateBy(x: pass == 0 ? 0 : -canvasSize.width, y: 0)
+            // Copies at 0, W and 2W inside a canvas 3W wide, which the offset below shifts
+            // left by W. The middle copy then slides across the screen while its neighbours
+            // cover the gap at either end. Drawing them at -W, 0, +W instead put the whole
+            // thing off the left edge for most of the drift cycle -- clouds that existed and
+            // were never on screen.
+            for pass in 0...2 {
+                let step = CGFloat(pass) * size.width
+                context.translateBy(x: step, y: 0)
+                draw(deck, in: &context, size: CGSize(width: size.width, height: canvasSize.height))
+                context.translateBy(x: -step, y: 0)
             }
         }
-        .frame(width: size.width, height: band)
-        .offset(x: offset)
+        .frame(width: size.width * 3, height: band)
+        .offset(x: offset - size.width)
         .foregroundStyle(.white)
         // Plain alpha, not plusLighter. Additive white over a blue sky is fine and over a
         // cream street is a smear -- and the mask that keeps them off the street is a

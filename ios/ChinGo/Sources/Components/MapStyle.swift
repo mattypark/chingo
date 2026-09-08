@@ -35,12 +35,21 @@ enum MapStyle {
     ///
     /// Keyed on the colour rather than on layer ids: ids come from upstream OpenMapTiles and
     /// can be renamed by a style regeneration, whereas this table is a statement about the
-    /// palette, which is the thing that actually drifted.
+    /// palette.
+    ///
+    /// It started as a list of colours that had *drifted* from `Ink`. It is now the whole map
+    /// palette, because the generated style is still the warm paper one and every colour in it
+    /// has to be replaced on the way in. When `build-style.py` catches up this shrinks back to
+    /// the drift list -- see docs/HANDOFF-MAP-PALETTE.md.
     private static var corrections: [String: Color] {
         [
-            "#EDE7D6": Ink.mapLand,           // background -- already right, still gets washed
+            "#EDE7D6": Ink.mapLand,           // background
             "#E9E2CF": Ink.mapLand,           // invented land_alt, on ten layers. The bug.
-            "#F2EBDA": Ink.mapBuilding,       // drifted
+            "#CFE0BC": Ink.mapPark,           // parks and grass
+            "#A8D8D0": Ink.mapWater,          // water
+            "#FFFDF7": Ink.mapRoad,           // the carriageway, on 38 layers
+            "#DDD5C2": Ink.mapRoadCasing,     // its edge, on 23
+            "#F2EBDA": Ink.mapBuilding,       // drifted; layer is stripped, kept for the map
             "#EADEC8": Ink.mapBuildingWarm,   // drifted
             "#DCCDB2": Ink.mapBuildingSide,   // drifted
             "#f2eae2": Ink.mapBuilding,       // upstream, never repainted (lowercase = untouched)
@@ -56,7 +65,7 @@ enum MapStyle {
     /// That has already cost one debugging session in this file. It is a named constant
     /// rather than a literal buried in a filename so that changing a transform and forgetting
     /// this are at least next to each other.
-    private static let styleVersion = 4
+    private static let styleVersion = 5
 
     /// A style file painted for this accent, written once and reused.
     static func url(for accent: Accent) -> URL? {
@@ -81,7 +90,7 @@ enum MapStyle {
         }
 
         let table = swaps(for: accent)
-        let painted = shortenBuildings(widenStreets(repaint(root, using: table)))
+        let painted = removeBuildings(widenStreets(repaint(root, using: table)))
 
         guard
             let out = try? JSONSerialization.data(withJSONObject: painted),
@@ -105,61 +114,25 @@ enum MapStyle {
 
     // MARK: Buildings
 
-    /// The tallest a building may be when you are standing right in it, in metres.
+    /// Buildings are removed from the style entirely.
     ///
-    /// Roughly two storeys. Pokemon GO clamps building height for three reasons and all three
-    /// apply here: a real-height tower at a raked camera hides the ground, the player and the
-    /// reason to be looking at the screen; OpenStreetMap height data is wildly uneven, so one
-    /// clamp is the only thing that looks the same in Tokyo and in a small town; and uniform
-    /// low blocks read as a toy city while real heights read as a map. The toy read is the art
-    /// direction.
-    private static let closeCap: Double = 8
+    /// The clamp this replaces was the wrong answer to the right problem. Short buildings
+    /// still pop in and out as you cross the zoom where the clamp engages, and they still
+    /// hide the ground you are standing on. Pokemon GO's answer is simpler and better: there
+    /// are no buildings. Stand inside one and the map shows the street, because the street is
+    /// the thing you are playing on.
+    ///
+    /// Dropping the layer rather than hiding it also removes the last thing that made zoom
+    /// feel unstable -- there is nothing left whose geometry changes as you pinch.
+    private static let buildingLayers = ["chingo-building-3d", "building", "building-top"]
 
-    /// Zoom at which the clamp is fully off and the city is at its real height.
-    private static let uncappedZoom: Double = 16.5
-    /// Zoom at which the clamp is fully on.
-    private static let cappedZoom: Double = 19
-
-    /// Clamps `fill-extrusion-height` by zoom: short when you are in the street, full height
-    /// when you pull back.
-    ///
-    /// **Clamped, not scaled.** Multiplying every height by the same fraction flattens the
-    /// whole skyline uniformly and a cathedral ends up the same height as a corner shop.
-    /// `min(height, cap)` leaves everything under the cap alone, so at middle zooms the tall
-    /// things are still visibly taller -- it only takes the tops off the ones that were about
-    /// to fill the screen.
-    ///
-    /// **The zoom interpolate has to be the outermost expression.** MapLibre only accepts a
-    /// zoom expression at the top level of a property value, so this cannot be
-    /// `["min", height, <interpolate on zoom>]`. It has to be an interpolate whose *outputs*
-    /// are the data expressions.
-    ///
-    /// **`build-style.py:160` says that shape makes MapLibre silently drop the layer. It does
-    /// not, on 6.29.** That was tested here rather than believed, and the buildings render.
-    /// What *does* silently drop the whole layer is an **unrecognised paint key** -- adding
-    /// `fill-extrusion-rounded-roof` (which MapLibre iOS does not implement) made every
-    /// building in the city disappear with nothing in the log. That is almost certainly the
-    /// bug the original comment was describing, misattributed to the expression next to it.
-    /// Worth knowing before anyone spends another afternoon on it.
-    private static func shortenBuildings(_ root: Any) -> Any {
+    private static func removeBuildings(_ root: Any) -> Any {
         guard var document = root as? [String: Any],
               let layers = document["layers"] as? [[String: Any]] else { return root }
 
-        document["layers"] = layers.map { layer -> [String: Any] in
-            guard layer["id"] as? String == "chingo-building-3d",
-                  var paint = layer["paint"] as? [String: Any],
-                  let full = paint["fill-extrusion-height"]
-            else { return layer }
-
-            paint["fill-extrusion-height"] = [
-                "interpolate", ["linear"], ["zoom"],
-                uncappedZoom, full,
-                cappedZoom, ["min", full, closeCap],
-            ] as [Any]
-
-            var shortened = layer
-            shortened["paint"] = paint
-            return shortened
+        document["layers"] = layers.filter { layer in
+            guard let id = layer["id"] as? String else { return true }
+            return !buildingLayers.contains(id)
         }
         return document
     }
