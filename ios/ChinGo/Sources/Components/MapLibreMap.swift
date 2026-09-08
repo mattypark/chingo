@@ -85,7 +85,7 @@ struct MapLibreMap: UIViewRepresentable {
         // notice hidden under the chrome is not a licence notice.
         map.attributionButton.tintColor = UIColor(Ink.textFaint)
         map.attributionButtonPosition = .bottomLeft
-        map.attributionButtonMargins = CGPoint(x: Space.inset, y: 132)
+        map.attributionButtonMargins = CGPoint(x: Space.inset, y: 142)
 
         projection?.attach(map)
         context.coordinator.projection = projection

@@ -264,66 +264,64 @@ struct GlobeScreen: View {
         VStack(spacing: Space.snug) {
             if globeEnabled, pins.count > 1 { faces }
 
-            // A centred cluster, not two corners.
+            // One slab with three cells, built the way `HomeBar`'s is: equal cells at
+            // `maxWidth: .infinity` separated by 3pt ink rules, the whole thing wearing a
+            // single sticker.
             //
-            // Measured off the reference rather than guessed: the circles are about 16.5% of
-            // the screen's width and sit roughly 24.8% apart centre to centre, with the middle
-            // one on the screen's own axis. Pushing them into opposite corners -- which is what
-            // this was -- makes them read as two unrelated controls that happen to share a row,
-            // which is exactly the mistake the home bar was built to fix.
-            //
-            // What is *not* copied is the material. Bump's chrome is Liquid Glass, translucent
-            // and refractive; ours is flat fill with a hard outline and a zero-blur shadow, and
-            // mixing the two would put two design languages on one screen.
-            GeometryReader { geo in
-                let size = min(geo.size.width * 0.165, 66)
-
-                HStack(spacing: geo.size.width * 0.248 - size) {
-                    roundButton(icon: "person.2.badge.gearshape.fill", label: "Sharing", size: size) {
-                        managing = true
-                    }
-                    .opacity(globeEnabled ? 1 : 0)
-                    .allowsHitTesting(globeEnabled)
-
-                    roundButton(icon: "globe", label: "Everyone", size: size) {
-                        fitToken += 1
-                    }
-                    .opacity(globeEnabled ? 1 : 0)
-                    .allowsHitTesting(globeEnabled)
-
-                    roundButton(icon: "map.fill", label: "Map", size: size) { dismiss() }
+            // This was three free-floating circles at a measured percentage spacing, and two
+            // things were wrong with it. They read as three unrelated controls that happened
+            // to share a row -- the exact fault the home bar was built to fix -- and each wore
+            // its own outline and hard shadow, so putting them on a surface would have been a
+            // sticker inside a sticker. The cells carry no shadow of their own, for the same
+            // reason the home bar's do not.
+            HStack(spacing: 0) {
+                cell(icon: "person.2.badge.gearshape.fill", label: "Sharing", enabled: globeEnabled) {
+                    managing = true
                 }
-                .frame(maxWidth: .infinity)
+                rule
+                cell(icon: "globe", label: "Everyone", enabled: globeEnabled) {
+                    fitToken += 1
+                }
+                rule
+                cell(icon: "map.fill", label: "Map", enabled: true) { dismiss() }
             }
-            .frame(height: 92)
-            .padding(.bottom, Space.step)
+            .frame(height: 74)
+            .sticker(fill: Ink.groundRaised, radius: Radius.surface)
+            .padding(.horizontal, Space.margin)
+            .padding(.trailing, Sticker.drop)
+            .padding(.bottom, Space.section)
         }
     }
 
-    private func roundButton(
+    /// 3pt, in ink, like every other line in this language.
+    private var rule: some View {
+        Rectangle()
+            .fill(Ink.text)
+            .frame(width: 3)
+            .padding(.vertical, Space.snug)
+    }
+
+    private func cell(
         icon: String,
         label: String,
-        size: CGFloat,
+        enabled: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        VStack(spacing: Space.hair) {
-            Button(action: action) {
+        Button(action: action) {
+            VStack(spacing: 1) {
                 Image(systemName: icon)
-                    .font(.system(size: size * 0.38, weight: .bold))
+                    .font(.system(size: 19, weight: .bold))
                     .foregroundStyle(Ink.text)
-                    .frame(width: size, height: size)
+                Text(label)
+                    .font(.custom(Typeface.bagel, size: 11))
+                    .foregroundStyle(Ink.textSoft)
             }
-            .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
-            .hitTarget()
-
-            Text(label)
-                .font(.custom(Typeface.bagel, size: 11))
-                .foregroundStyle(Ink.text)
-                // The label sits on the map, so it gets the same hard cream offset every other
-                // piece of type over live ground in this app gets.
-                .shadow(color: Ink.groundRaised, radius: 0, x: 1.5, y: 1.5)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
         }
-        .accessibilityElement(children: .combine)
+        .buttonStyle(SquashButtonStyle())
+        .opacity(enabled ? 1 : 0.35)
+        .allowsHitTesting(enabled)
         .accessibilityLabel(label)
     }
 

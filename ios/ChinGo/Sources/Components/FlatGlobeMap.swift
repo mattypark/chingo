@@ -41,14 +41,19 @@ struct FlatGlobeMap: UIViewRepresentable {
         map.allowsTilting = false
         map.minimumZoomLevel = 2
         map.maximumZoomLevel = 17
-        map.logoView.isHidden = false
+        // The MapLibre wordmark comes off; the attribution button stays. That split is a
+        // licence fact rather than a preference, and it is worth stating because getting it
+        // backwards is either a rude UI or a breach.
+        //
+        // MapLibre Native is BSD-2 and its logo carries no attribution requirement -- that was
+        // a Mapbox SDK term, and this is not Mapbox. The OpenStreetMap credit behind the (i)
+        // *is* required, under ODbL. The OSM Foundation's own attribution guidelines allow it
+        // to live "from an '(i)' button in the corner of the map or an 'About' option in a
+        // menu" rather than permanently on the map, which is exactly what this is.
+        map.logoView.isHidden = true
         map.attributionButton.isHidden = false
         map.compassView.isHidden = true
-        // Lifted clear of our own bottom bar. Both of these are required to stay visible --
-        // MapLibre's licence for the logo, and OpenStreetMap's ODbL for the attribution behind
-        // the button -- so they get moved rather than covered.
-        map.logoViewMargins = CGPoint(x: 8, y: 132)
-        map.attributionButtonMargins = CGPoint(x: 8, y: 132)
+        map.attributionButtonMargins = CGPoint(x: 8, y: 142)
         return map
     }
 

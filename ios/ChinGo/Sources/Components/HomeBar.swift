@@ -38,7 +38,10 @@ struct HomeBar: View {
     private static let lift: CGFloat = 30
     /// The hole the slab leaves for it: the 78pt button plus a little air on each side.
     private static let well: CGFloat = 94
-    private static let height: CGFloat = 64
+    /// 74, not 64. At 64 the slab read as a strip with things in it rather than as an object
+    /// -- the cells had no air above or below them and the rules ran almost edge to edge.
+    /// The catch button's `lift` is unchanged, so it still stands the same distance proud.
+    private static let height: CGFloat = 74
 
     var body: some View {
         slab
