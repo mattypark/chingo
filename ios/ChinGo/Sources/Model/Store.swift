@@ -199,6 +199,45 @@ final class MeRecord {
     /// When onboarding was completed. Nil means it has not been.
     var onboardedAt: Date?
 
+    // MARK: The things that cannot be derived
+    //
+    // `MapState` rebuilds XP and both streaks from the `CatchRecord` list every time it
+    // changes, which is why neither can drift. The four below have no record behind them --
+    // nothing in the store says a freeze was spent, or that a memory was revisited -- so they
+    // are stored, and `recompute` is handed them rather than accumulating anything itself.
+    //
+    // All defaulted, per the migration rule above: an install that already exists picks them
+    // up without a schema version.
+
+    /// XP earned by things that are not catches. Revisiting a memory is the only source today.
+    ///
+    /// Kept apart from the catch total rather than folded into one stored number, so a deleted
+    /// catch still correctly un-earns what it earned.
+    var awardedXP: Int = 0
+
+    /// Repairs left. Finch ships two, and finite is the whole mechanic: a repair you can
+    /// always afford is an undo, and an undo is not a decision.
+    var freezesLeft: Int = MeRecord.freezeAllowance
+
+    /// Day ordinals a freeze has been spent on. See `MapState.dayOrdinal(of:in:)`.
+    ///
+    /// A list rather than a count, because which days were covered is what the streak walk
+    /// needs -- a bare number cannot tell it where the holes were.
+    var frozenDays: [Int] = []
+
+    /// The last day the app was opened, as a day ordinal. Zero means never.
+    ///
+    /// Only the opt-in lapse icon reads this. It is deliberately not used to compute the
+    /// streak: opening the app is not what the streak counts, and wiring this into it would
+    /// turn the thing into exactly the leash `Streak`'s comment warns about.
+    var lastActiveDay: Int = 0
+
+    /// How many repairs somebody starts with, and the most a single repair may bridge.
+    ///
+    /// One constant for both, because they are the same fact from two directions: a gap you
+    /// could not cover even by spending everything is a gap there is no point offering to fix.
+    static let freezeAllowance = 2
+
     init(
         id: String = "me",
         handle: String = "",

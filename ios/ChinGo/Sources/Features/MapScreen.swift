@@ -135,6 +135,25 @@ struct MapScreen: View {
         return still
     }
 
+    /// Rebuild XP and both streaks from what happened, plus the two things that leave no
+    /// record behind. Cheap: a fold over the catch list and two walks over a set.
+    private func refreshProgress() {
+        let identity = me.first
+        state.recompute(
+            from: catches,
+            bonusXP: identity?.awardedXP ?? 0,
+            frozenDays: identity?.frozenDays ?? []
+        )
+    }
+
+    /// Revisiting a memory earns XP that no `CatchRecord` will ever account for, so it is
+    /// written to the one place that survives a recompute.
+    private func reconnected() {
+        guard let identity = me.first else { return }
+        identity.awardedXP += XPEvent.memoryRevisited.amount
+        try? context.save()
+    }
+
     /// Whether tapping this person opens their card. The ring on the ground is this line.
     private func canReveal(_ person: NearbyPerson) -> Bool {
         Double(person.approxMetres) <= Radar.interactionMetres
@@ -534,13 +553,17 @@ struct MapScreen: View {
             #endif
         }
         .onChange(of: catches.count, initial: true) { _, _ in
-            state.recompute(from: catches)
+            refreshProgress()
         }
+        // Freezes and the bonus are stored rather than derived, so a change to either has to
+        // be pushed in -- the catch list has not moved and would not re-run the line above.
+        .onChange(of: me.first?.frozenDays) { _, _ in refreshProgress() }
+        .onChange(of: me.first?.awardedXP) { _, _ in refreshProgress() }
         .onChange(of: location.course) { _, course in
             camera.follow(course: course)
         }
         .sheet(item: $openMemory) { memory in
-            MemorySheet(memory: memory) { state.award(.memoryRevisited) }
+            MemorySheet(memory: memory) { reconnected() }
                 .presentationDetents([.height(560)])
                 .presentationBackground(Ink.ground)
                 .presentationCornerRadius(30)
@@ -566,7 +589,10 @@ struct MapScreen: View {
             )
                 .presentationDetents([.large])
                 .presentationCornerRadius(30)
-                .onDisappear { state.award(.caught) }
+                // No award here. The `CatchRecord` the sheet just wrote is what earns the XP,
+                // and `recompute` counts it -- awarding again on the way out double-counted it
+                // and the next recompute silently deleted both.
+
         }
         .sheet(isPresented: $showAddFriend) {
             AddFriendSheet(cell: cell, placeLabel: location.placeLabel, nearby: state.nearby)
