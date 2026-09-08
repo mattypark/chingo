@@ -1,43 +1,62 @@
-# Frontend session — prompt
+# ChinGo — frontend session
 
-Paste this into a fresh session.
+You own `ios/`. The backend session owns `worker/`, `supabase/` and `scripts/`. Do not
+cross that line; `docs/SESSION-FRONTEND.md` has the full rules.
 
-```text
-You are the frontend session for ChinGo, at
-~/Downloads/current-projects/appscurrent/chingo.
+## Read these first
 
-Read docs/SESSION-FRONTEND.md and docs/DESIGN.md first, and treat DESIGN.md as a
-contract rather than documentation — it exists because AI-built UI drifts back
-toward generic defaults over a long session.
+Four handoff docs written at the end of the last session, each holding a decision rather
+than a to-do:
 
-You own: Features/, Components/, Root/, ChinGoDesign, the mascot and the asset
-catalogue. You do not edit ChinGoEngine, supabase/, worker/ or scripts/ — the
-backend session owns those. If a screen needs a rule that does not exist, ask for
-it rather than computing it in a view.
+- `docs/NEXT-STREAK-AND-PET.md` — consecutive-day streak, app icons, caring for the bear
+- `docs/NEXT-PHOTOS-ON-THE-MAP.md` — photo-library access, pins where photos were taken
+- `docs/NEXT-LIVE-ACTIVITIES.md` — Live Activities (blocked on project structure)
+- `docs/NEXT-NFC-STICKER.md` — the NFC sticker, as a side engine
 
-The visual language is "sticker book", derived from Bagel Fat One: hard shadows
-with zero blur, 3pt outlines, flat fills, and a press that sinks the block into
-its own shadow. No thin strokes, no translucent fills, no soft blur — those three
-are what make an app look like Pokemon GO, and this one deliberately does not.
+Also `docs/DESIGN.md` for the sticker language, and `docs/HANDOFF-MAP-PALETTE.md` if you
+touch the basemap.
 
-Build and screenshot everything you change; do not describe a screen you have not
-looked at. Commit after every change. Never push unless asked.
+## Finish first — two things designed but not built
 
-Current state: map, catch, album, memories, profile, splash and onboarding all
-work. 43 tests pass.
+Both are specified in the last session's plan and both have a known obstacle:
 
-Start by building the app, screenshotting the map and the profile, and telling me
-the three weakest things you see.
-```
+1. **The onboarding answer slides up.** After you submit, the typed answer rises to where
+   the question was, the way Bump's does. `OnboardingStep.swift` — collapse the fixed head
+   gap and the question→answer gap, fade the question. **Resign focus before animating**:
+   the keyboard's safe-area change will fight a hand-rolled offset. `AnswerField` needs a
+   `submitted` flag; both call sites in `OnboardingFlow.swift` pass it, and the age step's
+   sibling message moves with it.
 
-## What it is walking into
+2. **The map ↔ globe transition.** Matthew wants each piece of chrome to pop away and the
+   new screen's chrome to pop in, staggered, rather than the system slide.
+   `.fullScreenCover` gives no transition hook and `matchedGeometryEffect` cannot cross a
+   presentation boundary — so replace it with a `ZStack` swap inside `MapScreen`'s existing
+   stack, and give `GlobeScreen` an injected `onClose` instead of `@Environment(\.dismiss)`.
+   Map chrome currently shares one `.opacity`, so each piece needs its own animation value
+   to stagger. One element should genuinely fly: the home bar's globe cell → the globe
+   screen's "Everyone" button, same SF Symbol, and the code already says in prose that you
+   leave by the handle you came in through.
 
-- `./scripts/dev.sh` regenerates the Xcode project. Run it after adding files, and after any
-  "Missing package product" complaint — then close and reopen the project.
-- Launch flags: `-seedDemo` fills the store with realistic data,
-  `-open <album|profile|catch|deck>` lands on a surface directly, `-resetOnboarding` walks
-  first run again.
-- Known rough edges: the map's ground renders darker than the palette specifies, and the map
-  chrome is still in the old soft-shadow language rather than the sticker one.
-- The simulator wedges stale permission alerts over the first screen. `xcrun simctl erase`
-  clears it. That is the simulator, not the app.
+Then pick up the handoff docs in whatever order Matthew wants.
+
+## Three constraints not to rediscover
+
+- `ChinGoEngine/Progress.swift` argues **against** daily streaks in prose and counts
+  weeks-with-a-meetup. Matthew overruled it. **Rewrite that comment**, do not delete it.
+- `MapState` says XP and streak are derived and never stored. Freezes and claimed rewards
+  cannot be derived — break that invariant deliberately and update the comment.
+- `setAlternateIconName` always shows a system alert that cannot be suppressed through
+  public API. The auto-changing lapse icon must therefore be opt-in.
+
+## How this session works
+
+- Verify by running it: build, launch the simulator, screenshot, look. `-seedDemo`,
+  `-open globe|catch|album|profile`, `-onboardStep <name>`, `-resetOnboarding`,
+  `-skyAltitude <deg>`. Animations need a short frame sequence, not one still.
+- **Kill the simulator after each round** — it pegs the CPU.
+- `cd ios/ChinGoDesign && swift test` — 111 tests today, keep them green.
+- **Commit after every change**, authored as `Matthew Park <matthew.parkk0@gmail.com>`.
+  Never push; Matthew pushes.
+- Reference apps being combined: Bump/amo (map, onboarding, progressive unlock), Finch
+  (gentle streaks, pet care), Pokémon GO (the street map). The purpose underneath stays:
+  take pictures and remember the people you meet.
