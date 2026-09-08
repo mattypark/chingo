@@ -18,7 +18,11 @@ struct MemoryBubble: View {
                         .fill(Ink.groundRaised)
 
                     Group {
-                        if let image = PhotoStore.load(memory.photoFile) {
+                        if !memory.isDeveloped {
+                            // Too small for the caption; the frame alone carries it here, and
+                            // the sheet behind the pin says when.
+                            Developing(developsAt: memory.developsAt, showsCaption: false)
+                        } else if let image = PhotoStore.load(memory.photoFile) {
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)

@@ -24,6 +24,7 @@ struct CatchSheet: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Query private var me: [MeRecord]
 
     @State private var image: UIImage?
     @State private var showCamera = false
@@ -151,11 +152,16 @@ struct CatchSheet: View {
             if !seenHere { friend.distinctPlaceCount += 1 }
         }
 
+        // A photo does not arrive until nine tomorrow morning. A tag has no photo, so it
+        // has nothing to wait for.
+        let developsAt = kind == "snap" ? Develop.next(after: .now) : nil
+
         let record = CatchRecord(
             kind: kind,
             cell: cell,
             placeLabel: placeLabel,
             photoFile: photoFile,
+            developsAt: developsAt,
             friend: friend
         )
         context.insert(record)
@@ -170,14 +176,35 @@ struct CatchSheet: View {
                     happenedOn: .now,
                     latitude: coordinate.lat,
                     longitude: coordinate.lon,
-                    photoFile: photoFile
+                    photoFile: photoFile,
+                    developsAt: developsAt
                 )
             )
         }
 
         try? context.save()
+
+        // Ask for permission here and nowhere else. There is now a specific photo arriving at
+        // a specific time, which is the only moment the ask explains itself -- and if it is
+        // declined the photo still develops, it is just waiting when the app is next opened.
+        if let developsAt, me.first?.wantsDevelopAlerts != false {
+            let developing = developingHandles(at: developsAt, including: cleanHandle)
+            Task { await DevelopAlerts.schedule(at: developsAt, handles: developing) }
+        }
+
         onSaved(photoFile == nil ? nil : image)
         dismiss()
+    }
+
+    /// Everyone whose photo lands on the same morning, so one alert can name them all rather
+    /// than one alert per person arriving at the same second.
+    private func developingHandles(at developsAt: Date, including handle: String) -> [String] {
+        let descriptor = FetchDescriptor<CatchRecord>()
+        let all = (try? context.fetch(descriptor)) ?? []
+        let sameMorning = all
+            .filter { $0.developsAt == developsAt }
+            .compactMap { $0.friend?.handle }
+        return Array(Set(sameMorning + [handle]))
     }
 
     private func existingFriend(handle: String) -> FriendRecord? {

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import ChinGoDesign
 import ChinGoEngine
 
 /// Local-first storage.
@@ -81,6 +82,12 @@ final class CatchRecord {
     var cell: String
     var placeLabel: String?
     var photoFile: String?
+    /// When the photo becomes visible. Nil means it already is.
+    ///
+    /// Optional rather than defaulted so that every photo taken before this rule existed
+    /// stays visible. A migration that retroactively hid people's memories would be a bug
+    /// wearing a feature's clothes.
+    var developsAt: Date?
     var friend: FriendRecord?
 
     init(
@@ -90,6 +97,7 @@ final class CatchRecord {
         cell: String,
         placeLabel: String? = nil,
         photoFile: String? = nil,
+        developsAt: Date? = nil,
         friend: FriendRecord? = nil
     ) {
         self.id = id
@@ -98,8 +106,11 @@ final class CatchRecord {
         self.cell = cell
         self.placeLabel = placeLabel
         self.photoFile = photoFile
+        self.developsAt = developsAt
         self.friend = friend
     }
+
+    var isDeveloped: Bool { Develop.isDeveloped(developsAt) }
 }
 
 /// You.
@@ -123,6 +134,12 @@ final class MeRecord {
     /// ChinGo never shows an age, sorts by one, or wishes anyone a happy birthday, so keeping
     /// the date would be holding personal data with no feature behind it. The date is
     /// evaluated once at the gate and discarded.
+    /// Whether the morning alert is wanted. On by default, because it is the only
+    /// notification the app sends and it is the payoff of something the player already did --
+    /// but it is off in one tap, and turning it off silences the in-app version too. Toggles
+    /// that only govern push while the app is closed are the reason people say notification
+    /// settings do nothing.
+    var wantsDevelopAlerts: Bool = true
     var ageTier: Int
 
     /// When onboarding was completed. Nil means it has not been.
@@ -158,6 +175,10 @@ final class MemoryRecord {
     var latitude: Double
     var longitude: Double
     var photoFile: String?
+    /// When the photo becomes visible. Nil means it already is. Kept here as well as on the
+    /// catch because the map draws from memories, and a pin that showed the photo while the
+    /// album still hid it would make the rule look like a bug in one of the two places.
+    var developsAt: Date?
     /// Set the first time it resurfaces, so the app can avoid handing you the same memory
     /// every time you walk down the same street.
     var lastSurfaced: Date?
@@ -170,6 +191,7 @@ final class MemoryRecord {
         latitude: Double,
         longitude: Double,
         photoFile: String? = nil,
+        developsAt: Date? = nil,
         lastSurfaced: Date? = nil
     ) {
         self.id = id
@@ -179,8 +201,11 @@ final class MemoryRecord {
         self.latitude = latitude
         self.longitude = longitude
         self.photoFile = photoFile
+        self.developsAt = developsAt
         self.lastSurfaced = lastSurfaced
     }
+
+    var isDeveloped: Bool { Develop.isDeveloped(developsAt) }
 
     var cell: GeoCell { GeoCell(latitude: latitude, longitude: longitude) }
 

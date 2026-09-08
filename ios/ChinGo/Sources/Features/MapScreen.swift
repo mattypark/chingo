@@ -397,7 +397,9 @@ struct MemorySheet: View {
         SheetShell {
         VStack(spacing: 0) {
             Group {
-                if let image = PhotoStore.load(memory.photoFile) {
+                if !memory.isDeveloped {
+                    Developing(developsAt: memory.developsAt)
+                } else if let image = PhotoStore.load(memory.photoFile) {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)

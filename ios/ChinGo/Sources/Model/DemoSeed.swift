@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import SwiftData
+import ChinGoDesign
 import ChinGoEngine
 
 /// Debug-only seeding, behind a launch argument.
@@ -206,6 +207,19 @@ enum DemoSeed {
                 )
             )
         }
+
+        // One caught last night and still developing, so the waiting state is something you
+        // can look at now rather than tomorrow morning.
+        context.insert(
+            MemoryRecord(
+                friendHandle: "toby",
+                placeLabel: "the corner",
+                happenedOn: .now.addingTimeInterval(-day * 0.4),
+                latitude: base.latitude - 0.0008,
+                longitude: base.longitude - 0.0014,
+                developsAt: Develop.next(after: .now)
+            )
+        )
 
         try? context.save()
     }

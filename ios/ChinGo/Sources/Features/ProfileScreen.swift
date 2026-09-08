@@ -216,7 +216,9 @@ struct ProfileScreen: View {
             ForEach(withPhotos) { record in
                 VStack(alignment: .leading, spacing: Space.hair) {
                     Group {
-                        if let image = PhotoStore.load(record.photoFile) {
+                        if !record.isDeveloped {
+                            Developing(developsAt: record.developsAt, showsCaption: false)
+                        } else if let image = PhotoStore.load(record.photoFile) {
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
@@ -295,6 +297,8 @@ struct ProfileScreen: View {
 /// chosen during onboarding as part of saying who you are, so this is where somebody comes
 /// looking to change it.
 struct IdentityEditor: View {
+    @Environment(\.accent) private var accent
+
     @Bindable var record: MeRecord
 
     @Environment(\.modelContext) private var context
@@ -320,6 +324,23 @@ struct IdentityEditor: View {
                 }
                 .padding(.top, Space.tight)
 
+                // The only notification the app sends, and the only switch for it. Turning it
+                // off cancels what is already scheduled as well as what would be -- a toggle
+                // that leaves tomorrow's alert armed is why people say these settings do
+                // nothing.
+                Toggle(isOn: $record.wantsDevelopAlerts) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Tell me when photos develop")
+                            .font(.chinBody)
+                            .foregroundStyle(Ink.text)
+                        Text("Once, at nine the next morning. Nothing else.")
+                            .font(.chinFootnote)
+                            .foregroundStyle(Ink.textSoft)
+                    }
+                }
+                .tint(accent.signal)
+                .padding(.top, Space.step)
+
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, Space.margin)
@@ -330,6 +351,16 @@ struct IdentityEditor: View {
         // A colour change has to survive the sheet being dismissed by a swipe, and it has to
         // reach the map behind it immediately, so it commits on the tap rather than on exit.
         .onChange(of: record.bannerTint) { _, _ in try? context.save() }
+        .onChange(of: record.wantsDevelopAlerts) { _, wants in
+            try? context.save()
+            Task {
+                if wants {
+                    await DevelopAlerts.requestPermission()
+                } else {
+                    await DevelopAlerts.cancelAll()
+                }
+            }
+        }
     }
 
     private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
