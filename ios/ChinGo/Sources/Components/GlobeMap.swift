@@ -13,6 +13,8 @@ struct GlobePin: Identifiable, Equatable {
     /// and it usually is not.
     let age: TimeInterval
     let accent: Int
+    /// Their face, if they have set one. Nil is the common case and means show the bear.
+    let portraitFile: String?
 
     /// Equality is about what is drawn, and `age` deliberately is not part of it. It is
     /// derived from `Date.now` every time the list is rebuilt, so including it means two

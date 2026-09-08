@@ -62,7 +62,8 @@ struct GlobeScreen: View {
                 handle: friend.handle,
                 coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
                 age: age,
-                accent: friend.accentIndex
+                accent: friend.accentIndex,
+                portraitFile: friend.portraitFile
             )
         }
     }
@@ -144,8 +145,11 @@ struct GlobeScreen: View {
             ZStack {
                 ForEach(pins) { pin in
                     if let point = projection.point(for: pin.coordinate) {
-                        GlobeToken(pin: pin, showsName: true) { selected = pin }
-                            .position(x: point.x, y: point.y)
+                        GlobeToken(pin: pin) { selected = pin }
+                            // Lifted by half its own height so the tip lands on the
+                            // coordinate. `.position` centres, and a marker centred on a
+                            // point is a marker that is not on it.
+                            .position(x: point.x, y: point.y - GlobeToken.height / 2)
                     }
                 }
             }
@@ -177,7 +181,7 @@ struct GlobeScreen: View {
                                 focus = pin
                                 focusToken += 1
                             } label: {
-                                GlobeToken(pin: pin, showsName: false) {}
+                                GlobeToken(pin: pin, isMarker: false) {}
                                     .allowsHitTesting(false)
                                     .opacity(focus?.id == pin.id ? 1 : 0.72)
                             }
@@ -260,29 +264,54 @@ struct GlobeScreen: View {
         VStack(spacing: Space.snug) {
             if globeEnabled, pins.count > 1 { faces }
 
-            HStack(alignment: .bottom, spacing: Space.section) {
-                if globeEnabled {
-                    roundButton(icon: "person.2.badge.gearshape.fill", label: "Sharing") {
+            // A centred cluster, not two corners.
+            //
+            // Measured off the reference rather than guessed: the circles are about 16.5% of
+            // the screen's width and sit roughly 24.8% apart centre to centre, with the middle
+            // one on the screen's own axis. Pushing them into opposite corners -- which is what
+            // this was -- makes them read as two unrelated controls that happen to share a row,
+            // which is exactly the mistake the home bar was built to fix.
+            //
+            // What is *not* copied is the material. Bump's chrome is Liquid Glass, translucent
+            // and refractive; ours is flat fill with a hard outline and a zero-blur shadow, and
+            // mixing the two would put two design languages on one screen.
+            GeometryReader { geo in
+                let size = min(geo.size.width * 0.165, 66)
+
+                HStack(spacing: geo.size.width * 0.248 - size) {
+                    roundButton(icon: "person.2.badge.gearshape.fill", label: "Sharing", size: size) {
                         managing = true
                     }
+                    .opacity(globeEnabled ? 1 : 0)
+                    .allowsHitTesting(globeEnabled)
+
+                    roundButton(icon: "globe", label: "Everyone", size: size) {
+                        fitToken += 1
+                    }
+                    .opacity(globeEnabled ? 1 : 0)
+                    .allowsHitTesting(globeEnabled)
+
+                    roundButton(icon: "map.fill", label: "Map", size: size) { dismiss() }
                 }
-
-                Spacer(minLength: 0)
-
-                roundButton(icon: "map.fill", label: "Map") { dismiss() }
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, Space.margin)
-            .padding(.bottom, Space.section + Space.margin)
+            .frame(height: 92)
+            .padding(.bottom, Space.step)
         }
     }
 
-    private func roundButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+    private func roundButton(
+        icon: String,
+        label: String,
+        size: CGFloat,
+        action: @escaping () -> Void
+    ) -> some View {
         VStack(spacing: Space.hair) {
             Button(action: action) {
                 Image(systemName: icon)
-                    .font(.system(size: 19, weight: .bold))
+                    .font(.system(size: size * 0.38, weight: .bold))
                     .foregroundStyle(Ink.text)
-                    .frame(width: 52, height: 52)
+                    .frame(width: size, height: size)
             }
             .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
             .hitTarget()
@@ -419,33 +448,81 @@ private struct GlobePinCard: View {
 /// precision the position does not have.
 private struct GlobeToken: View {
     let pin: GlobePin
-    var showsName: Bool = true
+    /// False in the tray at the bottom of the screen, where the same avatar appears as a
+    /// button rather than as a marker. A stem there would be pointing at a row of buttons.
+    var isMarker: Bool = true
     var onTap: () -> Void
+
+    /// How tall the whole marker is, tip included. The caller lifts by this so the *tip*
+    /// lands on the coordinate rather than the middle of the face.
+    static let height: CGFloat = 62
+
+    private static let face: CGFloat = 46
+    private static let stem: CGFloat = 10
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 2) {
-                Group {
-                    if let bear = BearIcons.all[BearIcons.name(accent: pin.accent, phase: nil)] {
-                        Image(uiImage: bear).resizable().scaledToFit().padding(4)
-                    }
-                }
-                .frame(width: 46, height: 46)
-                .background(Circle().fill(Accent.at(pin.accent).signalLift))
-                .overlay(Circle().strokeBorder(Ink.text, lineWidth: 3))
+            VStack(spacing: 0) {
+                avatar
 
-                if showsName {
-                Text(pin.handle)
-                    .font(.custom(Typeface.bagel, size: 12))
-                    .foregroundStyle(Ink.text)
-                    // A hard cream offset rather than a blurred halo, so the label still
-                    // belongs to this app while sitting on a photograph of the Pacific.
-                    .shadow(color: Ink.groundRaised, radius: 0, x: 1.5, y: 1.5)
-                    .lineLimit(1)
+                if isMarker {
+                    // Sits over the stem rather than under the tip, so the label never covers
+                    // the point the marker is claiming.
+                    Text(pin.handle)
+                        .font(.custom(Typeface.bagel, size: 12))
+                        .foregroundStyle(Ink.text)
+                        // A hard cream offset rather than a blurred halo, so the label still
+                        // belongs to this app while sitting on somebody else's map.
+                        .shadow(color: Ink.groundRaised, radius: 0, x: 1.5, y: 1.5)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .offset(y: -2)
+                        .zIndex(1)
                 }
+
+                if isMarker { stem }
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(pin.handle), on the globe")
+        .accessibilityLabel("\(pin.handle), on the map")
+    }
+
+    /// Their face if they set one, otherwise their bear.
+    ///
+    /// The bear is not a placeholder for a missing photo -- it is what the map calls them and
+    /// it is in the colour they picked, so somebody who never adds a photo has a complete
+    /// identity rather than a greyed-out one.
+    private var avatar: some View {
+        Group {
+            if let portrait = PhotoStore.loadPortrait(pin.portraitFile) {
+                Image(uiImage: portrait).resizable().aspectRatio(contentMode: .fill)
+            } else if let bear = BearIcons.all[BearIcons.name(accent: pin.accent, phase: nil)] {
+                Image(uiImage: bear).resizable().scaledToFit().padding(4)
+            }
+        }
+        .frame(width: Self.face, height: Self.face)
+        .background(Circle().fill(Accent.at(pin.accent).signalLift))
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Ink.text, lineWidth: 3))
+        .zIndex(2)
+    }
+
+    /// The bit that makes it a pin rather than a floating token.
+    ///
+    /// A circle centred on a coordinate claims a place the size of the circle; a tip claims a
+    /// point. That is the whole difference, and it is why the label goes above the stem rather
+    /// than below it -- the one thing that must never be covered is the spot.
+    private var stem: some View {
+        ZStack(alignment: .bottom) {
+            Rectangle()
+                .fill(Ink.text)
+                .frame(width: 3, height: Self.stem)
+
+            Circle()
+                .fill(Ink.text)
+                .frame(width: 7, height: 7)
+                .offset(y: 3)
+        }
+        .frame(height: Self.stem)
     }
 }
