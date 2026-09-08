@@ -23,12 +23,20 @@ import ChinGoDesign
 
 /// A full-bleed moment. Used twice: the way in, and the way out.
 ///
-/// Berry, not the accent. This is the mascot's own colour -- the bear in the logo is purple --
-/// and it is the one place in the app allowed to take over the whole screen. The accent is the
-/// player's, and at this point in the flow they have not chosen it yet; on the last screen
-/// they have, and using it there would make the two heroes different colours and break the
-/// bookend.
+/// Cream, like every other screen. The bear brings the only colour.
+///
+/// This was a full-bleed berry field for a while, on the reasoning that the logo bear is
+/// purple and a hero should take over the screen. It was wrong for a simple reason: the bear
+/// is *also* purple, so a purple bear on a purple field is a cut-out that has to fight its own
+/// background, and the two screens it appeared on were the only two in the app that did not
+/// look like the app. Bump's own splash is a colour field and every screen after it is
+/// off-white -- copying the splash and not the flow got the ratio backwards.
+///
+/// So the field is the same paper as everything else and the hero is carried by scale instead:
+/// the bear at 200 points and the headline at 42.
 struct OnboardingHero<Content: View>: View {
+    @Environment(\.accent) private var accent
+
     let headline: String
     let primary: String
     var footnote: String? = nil
@@ -37,15 +45,7 @@ struct OnboardingHero<Content: View>: View {
 
     var body: some View {
         ZStack {
-            // Not a flat fill. A single dark plum reads as a splash screen that failed to
-            // load; the gradient gives it a light source and makes the bear look lit rather
-            // than pasted.
-            LinearGradient(
-                colors: [Ink.berryDeep, Ink.berry, Ink.berryLift],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            Ink.ground.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer(minLength: Space.section)
@@ -55,7 +55,7 @@ struct OnboardingHero<Content: View>: View {
                 Text(headline)
                     .font(.custom(Typeface.bagel, size: 42))
                     .tracking(-1)
-                    .foregroundStyle(Ink.onSignal)
+                    .foregroundStyle(Ink.text)
                     .multilineTextAlignment(.center)
                     .lineSpacing(-4)
                     .padding(.horizontal, Space.margin)
@@ -66,11 +66,11 @@ struct OnboardingHero<Content: View>: View {
                 Button(action: onPrimary) {
                     Text(primary)
                         .font(.custom(Typeface.bagel, size: 19))
-                        .foregroundStyle(Ink.berryDeep)
+                        .foregroundStyle(accent.onSignal)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Space.snug)
                 }
-                .buttonStyle(StickerButtonStyle(fill: Ink.onSignal, radius: Radius.pill))
+                .buttonStyle(StickerButtonStyle(fill: accent.signal, radius: Radius.pill))
                 .padding(.horizontal, Space.margin)
                 .padding(.trailing, Sticker.drop)
 
@@ -81,7 +81,7 @@ struct OnboardingHero<Content: View>: View {
                     // through without reading, which is worse than a line they might.
                     Text(footnote)
                         .font(.chinFootnote)
-                        .foregroundStyle(Ink.onSignal.opacity(0.7))
+                        .foregroundStyle(Ink.textFaint)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, Space.section)
                         .padding(.top, Space.snug)

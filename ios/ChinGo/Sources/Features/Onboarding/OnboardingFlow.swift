@@ -91,9 +91,9 @@ struct OnboardingFlow: View {
                 .resizable()
                 .scaledToFit()
                 .frame(height: 200)
-                // Hard, not blurred, and in the deep end of the field's own gradient. The bear
-                // is a sticker and this is the shadow a sticker throws.
-                .shadow(color: Ink.berryDeep.opacity(0.55), radius: 0, x: 8, y: 8)
+                // Hard, not blurred. The bear is a sticker and this is the shadow a sticker
+                // throws -- the same zero-blur offset every other object in the app gets.
+                .shadow(color: Ink.text.opacity(0.18), radius: 0, x: 8, y: 8)
         }
     }
 
@@ -262,7 +262,7 @@ struct OnboardingFlow: View {
                     .resizable()
                     .scaledToFit()
                     .frame(height: 200)
-                    .shadow(color: Ink.berryDeep.opacity(0.55), radius: 0, x: 8, y: 8)
+                    .shadow(color: Ink.text.opacity(0.18), radius: 0, x: 8, y: 8)
                     // The one reward beat onboarding is allowed. It fires on arrival, once.
                     .rewardBeat(on: step)
             }
