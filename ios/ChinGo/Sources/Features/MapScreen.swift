@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import CoreLocation
 import ChinGoDesign
 import ChinGoEngine
 
@@ -260,7 +261,14 @@ struct MapScreen: View {
             SkyBand(latitude: here.lat, longitude: here.lon, bearing: camera.bearing)
 
             memoryLayer
-            PlayerPuck(level: state.level, progress: state.levelProgress)
+            PlayerPuck(
+                level: state.level,
+                progress: state.levelProgress,
+                // Walks when you are walking. `course` is only published above a walking
+                // threshold, so standing still is a genuine idle rather than a frozen
+                // walk frame -- the same rule every other bear on the map is drawn by.
+                phase: location.course == nil ? nil : walkPhase
+            )
 
             VStack(spacing: 0) {
                 topBar
@@ -485,22 +493,33 @@ struct MapScreen: View {
     /// Memories are placed by their real offset from where you are standing, in metres,
     /// scaled to the screen. That is what makes the placeholder map behave like a map: walk
     /// a block and the pins move correctly, even before MapLibre exists.
+    /// Memories, standing where they happened.
+    ///
+    /// Placed by asking the map where the coordinate is, not by converting metres to points at
+    /// a fixed rate. The fixed rate was 3.4 metres per point and it was wrong in three
+    /// independent ways at once: it ignored zoom, so every pin sat at whatever distance 3.4
+    /// happened to mean; it ignored bearing, so turning the map left the pins facing north;
+    /// and it ignored pitch, so nothing was on the ground plane the rest of the screen is
+    /// drawn on. At the zoom this map now opens at, a memory fifty metres away was landing
+    /// fifteen points from the puck -- a pile of polaroids on top of the player.
     private var memoryLayer: some View {
         GeometryReader { geo in
-            let metresPerPoint = 3.4
             ForEach(visibleMemories) { memory in
-                let dx = Geo.metres(from: here, to: (here.lat, memory.longitude))
-                    * (memory.longitude < here.lon ? -1 : 1)
-                let dy = Geo.metres(from: here, to: (memory.latitude, here.lon))
-                    * (memory.latitude < here.lat ? 1 : -1)
-
-                MemoryBubble(memory: memory) { openMemory = memory }
-                    .position(
-                        x: geo.size.width / 2 + dx / metresPerPoint,
-                        y: geo.size.height / 2 + dy / metresPerPoint
-                    )
+                if let point = projection.point(
+                    for: CLLocationCoordinate2D(latitude: memory.latitude, longitude: memory.longitude)
+                ), geo.frame(in: .local).insetBy(dx: -60, dy: -60).contains(point) {
+                    MemoryBubble(memory: memory) { openMemory = memory }
+                        // Anchored at its foot, like the bears, so a pin sits on the spot
+                        // rather than hovering with the spot at its middle.
+                        .position(x: point.x, y: point.y - 30)
+                }
             }
         }
+        // Same reason as the reveal card: the map ignores the safe area and this has to be
+        // measured in the same space, and reading `tick` is what re-places these as the
+        // camera moves.
+        .ignoresSafeArea()
+        .id(projection.tick)
     }
 
     private var topBar: some View {

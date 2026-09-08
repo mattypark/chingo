@@ -80,6 +80,15 @@ enum BearIcons {
         let target = colour.resolve(in: EnvironmentValues())
         let (tr, tg, tb) = (Double(target.red), Double(target.green), Double(target.blue))
 
+        // What "normal body colour" is on this render, measured rather than assumed.
+        //
+        // Without it the shading is normalised against the *accent's* lightness instead of the
+        // source's, and every accent comes out at the lightness of the berry body it replaced
+        // -- a dark plum. Coral arrived as chestnut brown, which is the correct answer to the
+        // wrong question: it preserved the render's shading so faithfully that the colour the
+        // player picked stopped being visible.
+        let bodyLevel = bodyLightness(of: pixels)
+
         for i in stride(from: 0, to: pixels.count, by: 4) {
             let a = Double(pixels[i + 3]) / 255
             guard a > 0.01 else { continue }
@@ -98,7 +107,9 @@ enum BearIcons {
             // through the anti-aliased edge so nothing gets a hard rim.
             let lightness = (high + low) / 2
             let strength = min((chroma - 0.14) / 0.20, 1)
-            let scale = lightness / max((tr + tg + tb) / 3, 0.001)
+            // Clamped, so a specular highlight cannot wash the accent out to white and a deep
+            // shadow cannot take it to black. The bear has to stay recognisably one colour.
+            let scale = min(max(lightness / bodyLevel, 0.62), 1.38)
             let mix = { (channel: Double, tint: Double) -> Double in
                 let lit = min(tint * scale, 1)
                 return channel + (lit - channel) * strength
@@ -109,6 +120,47 @@ enum BearIcons {
         }
 
         return context.makeImage().map { UIImage(cgImage: $0, scale: image.scale, orientation: .up) }
+    }
+
+    /// The dominant lightness of the coloured pixels -- what "body colour" means on this
+    /// render, so a body pixel can be made to land exactly on the accent.
+    ///
+    /// **Median, not mean, and the difference is the whole thing.** The mascot's coloured
+    /// pixels are sharply bimodal: 400k of them sit at lightness 0.32 (the body) and 97k at
+    /// 0.86 (the peach muzzle and belly, which carry enough chroma to count). Their mean is
+    /// 0.44, which describes neither cluster -- it lands in the empty gap between them, so
+    /// the body normalises to 0.74 of the accent and every bear comes out a shade of brick.
+    /// The median lands in the body, where the answer is.
+    ///
+    /// Counted into 256 buckets rather than sorted, because this runs over 24 bitmaps at
+    /// launch and sorting half a million doubles per bitmap to find one number is not a
+    /// reasonable way to start an app.
+    ///
+    /// Falls back to a mid grey if the source has no coloured pixels at all, which would
+    /// otherwise divide by zero and render every bear white.
+    private static func bodyLightness(of pixels: [UInt8]) -> Double {
+        var buckets = [Int](repeating: 0, count: 256)
+        var count = 0
+
+        for i in stride(from: 0, to: pixels.count, by: 4) {
+            let a = Double(pixels[i + 3]) / 255
+            guard a > 0.01 else { continue }
+            let r = Double(pixels[i]) / 255 / a
+            let g = Double(pixels[i + 1]) / 255 / a
+            let b = Double(pixels[i + 2]) / 255 / a
+            let high = max(r, g, b), low = min(r, g, b)
+            guard high - low > 0.14 else { continue }
+            buckets[min(Int((high + low) / 2 * 255), 255)] += 1
+            count += 1
+        }
+        guard count > 0 else { return 0.5 }
+
+        var seen = 0
+        for (level, tally) in buckets.enumerated() {
+            seen += tally
+            if seen * 2 >= count { return Double(level) / 255 }
+        }
+        return 0.5
     }
 
     // MARK: Motion
