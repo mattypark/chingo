@@ -94,6 +94,18 @@ struct OnboardingHero<Content: View>: View {
 
 // MARK: - Question
 
+/// Timings the question screen needs but cannot hold itself: `OnboardingQuestion` is generic
+/// over its answer, and a generic type cannot have a static stored property.
+private enum Rise {
+    /// How long to wait before the collapse starts.
+    ///
+    /// The keyboard's own dismissal is 0.25s and it animates the safe area, which moves the
+    /// whole question stack. A hand-rolled offset started in the same frame fights it: the
+    /// answer drops as the keyboard leaves and *then* slides up, which reads as a glitch
+    /// rather than as a lift. So focus is resigned first and this waits for it to be gone.
+    static let keyboardExit: Double = 0.28
+}
+
 /// One question, and the answer as the largest thing on screen.
 ///
 /// The question is deliberately quiet -- `chinFootnote` in `textSoft`, top of the screen, no
@@ -109,12 +121,19 @@ struct OnboardingQuestion<Content: View>: View {
     /// Nil while the answer is not yet valid; the button appears when it becomes non-nil.
     var canAdvance: Bool
     var footnote: String? = nil
+    /// The answer has been given and is on its way out. Collapses the two gaps above it so
+    /// what you typed rises into the question's place, and fades the question behind it.
+    ///
+    /// Only the steps with a typed answer set this. On `look`, `permissions` and `friends`
+    /// there is nothing that was *yours* to lift, and lifting the controls instead would be
+    /// motion for its own sake.
+    var submitted: Bool = false
     var onPrimary: () -> Void
     @ViewBuilder var answer: () -> Content
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0).frame(height: Space.section * 2)
+            Spacer(minLength: 0).frame(height: submitted ? Space.section : Space.section * 2)
 
             // The question sits directly above its answer rather than being pinned to the top
             // of the screen. A question at the top and an answer in the middle are two
@@ -125,10 +144,15 @@ struct OnboardingQuestion<Content: View>: View {
                 .foregroundStyle(Ink.textSoft)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Space.margin)
+                // Fades in place rather than collapsing its frame. The rise comes from the
+                // two gaps around it, so nothing here has to be measured -- a question that
+                // wraps to two lines shifts the landing by its own height and still reads
+                // as the answer taking its place.
+                .opacity(submitted ? 0 : 1)
 
             answer()
                 .padding(.horizontal, Space.margin)
-                .padding(.top, Space.section)
+                .padding(.top, submitted ? Space.tight : Space.section)
 
             Spacer(minLength: Space.step)
 
@@ -154,12 +178,20 @@ struct OnboardingQuestion<Content: View>: View {
             .padding(.horizontal, Space.margin)
             .padding(.trailing, Sticker.drop)
             .padding(.bottom, Space.margin)
-            .opacity(canAdvance ? 1 : 0)
+            .opacity(canAdvance && !submitted ? 1 : 0)
             // Not just hidden -- unreachable. An invisible button that still takes taps is
-            // worse than a visible one that does nothing.
-            .allowsHitTesting(canAdvance)
+            // worse than a visible one that does nothing, and during the rise it would take
+            // a second tap that queues a second advance.
+            .allowsHitTesting(canAdvance && !submitted)
             .animation(Motion.surface, value: canAdvance)
         }
+        // One delayed animation over every value that reads `submitted`, rather than a
+        // `withAnimation` at the call site: the delay is a property of this layout fighting
+        // the keyboard, not of the decision to move on.
+        .animation(
+            Motion.reduceMotion ? nil : Motion.surface.delay(Rise.keyboardExit),
+            value: submitted
+        )
     }
 }
 
@@ -171,8 +203,19 @@ struct AnswerField: View {
     var placeholder: String
     var keyboard: UIKeyboardType = .default
     var limit: Int
+    /// The answer has been given. Puts the keyboard away *before* the layout above starts
+    /// collapsing -- see `OnboardingQuestion.keyboardExit` for why the order matters.
+    var submitted: Bool = false
 
     @FocusState private var focused: Bool
+
+    /// Digits only, derived from the keyboard rather than asked for separately.
+    ///
+    /// `.numberPad` is a suggestion, not a rule: a hardware keyboard, a paste, or a
+    /// dictation all put letters into a field that asked for a number, and the age step
+    /// then reads "mat" and refuses an answer nobody could see was wrong. Deriving it here
+    /// means a caller cannot pick the number pad and forget the filter.
+    private var digitsOnly: Bool { keyboard == .numberPad }
 
     var body: some View {
         TextField(placeholder, text: text)
@@ -190,12 +233,56 @@ struct AnswerField: View {
             // and there is no edge to explain where the text went.
             .minimumScaleFactor(0.45)
             .onChange(of: text.wrappedValue) { _, new in
-                if new.count > limit { text.wrappedValue = String(new.prefix(limit)) }
+                var cleaned = digitsOnly ? new.filter(\.isNumber) : new
+                if cleaned.count > limit { cleaned = String(cleaned.prefix(limit)) }
+                if cleaned != new { text.wrappedValue = cleaned }
             }
             .onAppear {
                 // Keyboard up on arrival. The screen asks one question; making somebody tap
                 // the answer before they can give it is a step that exists for no reason.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { focused = true }
+                //
+                // Guarded on `submitted` because the delay outlives the tap: a field that
+                // arrives and is answered inside 0.35s would otherwise take the keyboard
+                // back up underneath the rise.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    guard !submitted else { return }
+                    focused = true
+                }
             }
+            .onChange(of: submitted) { _, done in
+                if done { focused = false }
+            }
+    }
+}
+
+// MARK: - Driving it from the command line
+
+extension View {
+    /// Types the answer and presses the button, from `-answer` and `-autoSubmit`.
+    ///
+    /// A no-op without the flags, and compiled out of release entirely. It exists because the
+    /// rise is a *submit* beat: `simctl` can open this screen but cannot tap anything on it,
+    /// so without a way to press the button from a launch argument the one animation the
+    /// screen was built for could only ever be described, not looked at.
+    func debugAnswer(
+        _ text: Binding<String>,
+        for step: String,
+        submit: @escaping () -> Void
+    ) -> some View {
+        #if DEBUG
+        task {
+            guard let answer = DemoSeed.answer(for: step) else { return }
+            // After `AnswerField`'s own focus delay, so the keyboard is up and the beat
+            // starts from the state a real person would be in.
+            try? await Task.sleep(for: .milliseconds(700))
+            text.wrappedValue = answer
+
+            guard DemoSeed.autoSubmits else { return }
+            try? await Task.sleep(for: .milliseconds(700))
+            submit()
+        }
+        #else
+        self
+        #endif
     }
 }

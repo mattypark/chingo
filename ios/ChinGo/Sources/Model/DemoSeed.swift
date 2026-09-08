@@ -93,6 +93,31 @@ enum DemoSeed {
         return args[args.index(after: i)]
     }
 
+    /// `-answer matthew` fills in the name, `-age 22` fills in the age.
+    ///
+    /// Two flags rather than one, because one flag typed itself into every question it
+    /// reached: the name arrived on the age step as well, where a three-character limit
+    /// truncated it to "mat" and the age gate refused a word.
+    static func answer(for step: String) -> String? {
+        let flag = step == "age" ? "-age" : "-answer"
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: flag), args.index(after: i) < args.endIndex else {
+            return nil
+        }
+        return args[args.index(after: i)]
+    }
+
+    /// `-autoSubmit` presses the question's own primary button a beat after it appears.
+    ///
+    /// Sibling of `-open`, and there for a stronger version of the same reason. `simctl` can
+    /// launch straight onto a screen but it cannot tap anything on it, so a beat that only
+    /// happens *on submit* -- the answer rising into the question's place -- is invisible from
+    /// the command line. Without this the one animation the screen exists to get right is the
+    /// one thing that ships on trust.
+    static var autoSubmits: Bool {
+        ProcessInfo.processInfo.arguments.contains("-autoSubmit")
+    }
+
     /// Presence, which does not live in the store.
     ///
     /// `MapState.nearby` stays empty until the backend wires real presence, so without this

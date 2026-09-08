@@ -28,6 +28,9 @@ struct OnboardingFlow: View {
     @State private var wantsNotifications = false
     @State private var wantsGlobe = false
     @State private var blocked = false
+    /// The answer on the current step has been given and is rising into the question's place.
+    /// Reset once the step it belonged to has finished leaving.
+    @State private var submitted = false
 
     private enum Step: Int, CaseIterable {
         case welcome, name, age, look, permissions, friends, done
@@ -102,14 +105,20 @@ struct OnboardingFlow: View {
             question: "What should we call you?",
             primary: "That's me",
             canAdvance: cleanHandle.count >= 2,
-            footnote: "This is what people see when you're nearby."
+            footnote: "This is what people see when you're nearby.",
+            submitted: submitted
         ) {
-            identity().handle = cleanHandle
-            try? context.save()
-            advance(to: .age)
+            submitName()
         } answer: {
-            AnswerField(text: $handle, placeholder: "your name", limit: 20)
+            AnswerField(text: $handle, placeholder: "your name", limit: 20, submitted: submitted)
         }
+        .debugAnswer($handle, for: "name", submit: submitName)
+    }
+
+    private func submitName() {
+        identity().handle = cleanHandle
+        try? context.save()
+        answerRises(then: .age)
     }
 
     private var ageStep: some View {
@@ -119,20 +128,13 @@ struct OnboardingFlow: View {
             canAdvance: Int(age) != nil && !blocked,
             // Deliberately does not say what the threshold is. A screen that announces the
             // cut-off is a screen that tells people which answer to give.
-            footnote: blocked ? nil : "There's an age limit, because ChinGo puts you in the same place as other people. We keep the answer, not the number."
+            footnote: blocked ? nil : "There's an age limit, because ChinGo puts you in the same place as other people. We keep the answer, not the number.",
+            submitted: submitted
         ) {
-            let tier = AgeGate.tier(age: Int(age) ?? 0)
-            identity().ageTier = tier.rawValue
-            try? context.save()
-
-            if tier == .adult {
-                advance(to: .look)
-            } else {
-                withAnimation(Motion.surface) { blocked = true }
-            }
+            submitAge()
         } answer: {
             VStack(spacing: Space.inset) {
-                AnswerField(text: $age, placeholder: "00", keyboard: .numberPad, limit: 3)
+                AnswerField(text: $age, placeholder: "00", keyboard: .numberPad, limit: 3, submitted: submitted)
 
                 if blocked {
                     // Plain, and not written by the bear. Cuteness in a moment that closes a
@@ -144,6 +146,21 @@ struct OnboardingFlow: View {
                         .multilineTextAlignment(.center)
                 }
             }
+        }
+        .debugAnswer($age, for: "age", submit: submitAge)
+    }
+
+    private func submitAge() {
+        let tier = AgeGate.tier(age: Int(age) ?? 0)
+        identity().ageTier = tier.rawValue
+        try? context.save()
+
+        if tier == .adult {
+            answerRises(then: .look)
+        } else {
+            // Deliberately does not rise. The lift is a small congratulation on an answer
+            // being accepted, and this is the one screen where the answer closes a door.
+            withAnimation(Motion.surface) { blocked = true }
         }
     }
 
@@ -283,6 +300,34 @@ struct OnboardingFlow: View {
 
     private func advance(to next: Step) {
         withAnimation(Motion.surface) { step = next }
+    }
+
+    /// What you typed rises into the question's place, and then the screen changes.
+    ///
+    /// Bump's beat, and the reason it is worth the wait: the last thing you see before a
+    /// question leaves is your own answer where the question was, which reads as being heard
+    /// rather than as a form advancing. `OnboardingQuestion` owns the geometry; this owns
+    /// only the order.
+    ///
+    /// The waits are not decoration, and neither of them is a round number by accident.
+    ///
+    /// `submitted` puts the keyboard away immediately; the collapse is held back behind it by
+    /// `Rise.keyboardExit` (0.28s) and then runs for one `Motion.surface` (0.42s), so the rise
+    /// is not finished until 0.70s. The first wait has to clear that or the step transition
+    /// starts while the answer is still travelling -- which is the same collision the delay
+    /// exists to avoid, arriving from the other side. The second is longer than the
+    /// transition, so `submitted` clears only once the screen that owned the answer is gone;
+    /// reset any earlier and the outgoing view re-expands while it is still sliding away.
+    private func answerRises(then next: Step) {
+        guard !Motion.reduceMotion else { return advance(to: next) }
+
+        submitted = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(760))
+            advance(to: next)
+            try? await Task.sleep(for: .milliseconds(460))
+            submitted = false
+        }
     }
 
     /// Reads and writes the accent index on the record itself rather than parking it in
