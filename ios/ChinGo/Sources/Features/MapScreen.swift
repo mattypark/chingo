@@ -149,13 +149,36 @@ struct MapScreen: View {
 
     /// Rebuild XP and both streaks from what happened, plus the two things that leave no
     /// record behind. Cheap: a fold over the catch list and two walks over a set.
+    /// The stored record, if there is one yet.
+    private var identity: MeRecord? { me.first }
+
     private func refreshProgress() {
-        let identity = me.first
         state.recompute(
             from: catches,
             bonusXP: identity?.awardedXP ?? 0,
             frozenDays: identity?.frozenDays ?? []
         )
+    }
+
+    /// Put the home-screen icon back in step with how long it has been, and stamp today.
+    ///
+    /// Runs off the same pass that rebuilds progress, because that is the first moment both
+    /// the day ordinal and the stored record are available together. Stamping *after* the
+    /// reconcile matters: the check needs the day of the previous launch, and writing today
+    /// first would make every launch look like it happened today.
+    private func markActive() {
+        guard let identity, state.today > 0 else { return }
+
+        LapseIcon.reconcile(
+            lastActiveDay: identity.lastActiveDay,
+            today: state.today,
+            chosen: identity.alternateIcon,
+            wantsLapseIcon: identity.wantsLapseIcon
+        )
+
+        guard identity.lastActiveDay != state.today else { return }
+        identity.lastActiveDay = state.today
+        try? context.save()
     }
 
     /// Revisiting a memory earns XP that no `CatchRecord` will ever account for, so it is
@@ -593,7 +616,7 @@ struct MapScreen: View {
             #if DEBUG
             switch DemoSeed.opens {
             case "album": showAlbum = true
-            case "profile": showProfile = true
+            case "profile", "edit": showProfile = true
             case "catch": catchMenu = true
             case "globe": showGlobe = true
             case "streak": showStreak = true
@@ -628,6 +651,7 @@ struct MapScreen: View {
         }
         .onChange(of: catches.count, initial: true) { _, _ in
             refreshProgress()
+            markActive()
         }
         // Freezes and the bonus are stored rather than derived, so a change to either has to
         // be pushed in -- the catch list has not moved and would not re-run the line above.

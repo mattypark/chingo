@@ -71,8 +71,13 @@ struct ProfileScreen: View {
             }
             .ignoresSafeArea()
         }
+        #if DEBUG
+        // `-open edit` lands on the editor rather than on the profile behind it. The icon
+        // picker is two taps in, which is two taps simctl cannot make.
+        .task { if DemoSeed.opens == "edit" { editing = true } }
+        #endif
         .sheet(isPresented: $editing) {
-            IdentityEditor(record: identity ?? newIdentity())
+            IdentityEditor(record: identity ?? newIdentity(), level: state.level)
                 .presentationDetents([.height(560)])
                 .presentationBackground(Ink.ground)
                 .presentationCornerRadius(Radius.surface)
@@ -318,6 +323,9 @@ struct IdentityEditor: View {
     @Environment(\.accent) private var accent
 
     @Bindable var record: MeRecord
+    /// What has been earned, for the icon picker. Passed in rather than recomputed: the level
+    /// is derived from the catch list and this sheet does not have one.
+    let level: Int
 
     @Environment(\.modelContext) private var context
 
@@ -341,6 +349,27 @@ struct IdentityEditor: View {
                     AccentPicker(selection: $record.bannerTint)
                 }
                 .padding(.top, Space.tight)
+
+                // Next to the colour, and for the reason this file's own doc comment already
+                // gives for the colour being here: it was chosen as part of saying who you
+                // are, so this is where somebody comes looking to change it. An icon is the
+                // same kind of choice, and there is no Settings screen in the app.
+                AppIconPicker(selection: $record.alternateIcon, level: level)
+                    .padding(.top, Space.step)
+
+                // The one that cannot be automatic. See `MeRecord.wantsLapseIcon`.
+                Toggle(isOn: $record.wantsLapseIcon) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Let the bear change the icon")
+                            .font(.chinBody)
+                            .foregroundStyle(Ink.text)
+                        Text("If you've been away a while, it swaps to the sleeping one until you're back. iOS shows an alert when it does.")
+                            .font(.chinFootnote)
+                            .foregroundStyle(Ink.textSoft)
+                    }
+                }
+                .tint(accent.signal)
+                .padding(.top, Space.step)
 
                 // The only notification the app sends, and the only switch for it. Turning it
                 // off cancels what is already scheduled as well as what would be -- a toggle
@@ -385,6 +414,10 @@ struct IdentityEditor: View {
         // A colour change has to survive the sheet being dismissed by a swipe, and it has to
         // reach the map behind it immediately, so it commits on the tap rather than on exit.
         .onChange(of: record.bannerTint) { _, _ in try? context.save() }
+        // Same reasoning as the colour: the icon commits the moment the system accepts it,
+        // because the change is already visible on the home screen by then.
+        .onChange(of: record.alternateIcon) { _, _ in try? context.save() }
+        .onChange(of: record.wantsLapseIcon) { _, _ in try? context.save() }
         .onChange(of: record.wantsMemoryNudges) { _, _ in try? context.save() }
         .onChange(of: record.wantsDevelopAlerts) { _, wants in
             try? context.save()

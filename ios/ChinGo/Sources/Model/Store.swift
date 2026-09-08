@@ -225,6 +225,18 @@ final class MeRecord {
     /// needs -- a bare number cannot tell it where the holes were.
     var frozenDays: [Int] = []
 
+    /// The alternate icon chosen in the profile, or nil for the one the app ships with.
+    var alternateIcon: String?
+
+    /// Whether the bear is allowed to change the icon on its own after a long absence.
+    ///
+    /// Off by default and it has to stay that way. `setAlternateIconName` always shows a
+    /// system alert that no public API can suppress, so an automatic swap fires "You have
+    /// changed the icon for ChinGo" at somebody who is in another app entirely. Duolingo does
+    /// exactly this and it is the part of their guilt mechanics people screenshot. Opt-in, and
+    /// worded as something the bear does rather than something done to you.
+    var wantsLapseIcon: Bool = false
+
     /// The last day the app was opened, as a day ordinal. Zero means never.
     ///
     /// Only the opt-in lapse icon reads this. It is deliberately not used to compute the
