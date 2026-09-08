@@ -10,17 +10,28 @@ public enum Ink {
 
     // MARK: Ground
 
-    /// Warm paper, not white. White chrome floating over a white map has no edge.
-    public static let ground = Color(hex: 0xF6F2E7)
-    public static let groundRaised = Color(hex: 0xFFFDF7)
-    public static let groundSunk = Color(hex: 0xEAE4D4)
+    /// White paper. This was warm cream, on the reasoning that white chrome floating over a
+    /// white map has no edge — which was true of the placeholder map and stopped being true
+    /// the day the basemap went green. Matthew's call, and the map is what makes it safe: a
+    /// white card on a green field separates on its own, and every card also carries a 3pt ink
+    /// outline and a hard shadow, so the edge was never the ground's job in the first place.
+    public static let ground = Color(hex: 0xFFFFFF)
+    /// Raised surfaces are the same white. In this language a raised block is told apart by
+    /// its outline and the hard offset under it, not by being a shade lighter than the sheet —
+    /// two near-identical whites separated by a hairline of tone is the soft-elevation idea
+    /// the sticker treatment replaced.
+    public static let groundRaised = Color(hex: 0xFFFFFF)
+    /// A well: the one ground that still steps *down*, because a hole cannot be told from its
+    /// surface by an outline it does not have. Neutral now rather than warm, so it reads as
+    /// shadow on white paper rather than as the last piece of cream left behind.
+    public static let groundSunk = Color(hex: 0xEDEDED)
 
     // MARK: Text
 
     public static let text = Color(hex: 0x1C1A16)
     public static let textSoft = Color(hex: 0x6B655A)
     public static let textFaint = Color(hex: 0xA39C8D)
-    public static let onSignal = Color(hex: 0xFFFDF7)
+    public static let onSignal = Color(hex: 0xFFFFFF)
 
     // MARK: Signal
     //

@@ -22,7 +22,8 @@ struct OnboardingFlow: View {
     @Query private var me: [MeRecord]
 
     @State private var step: Step = OnboardingFlow.opening
-    @State private var handle = ""
+    @State private var firstName = ""
+    @State private var lastName = ""
     @State private var age = ""
     @State private var wantsLocation = false
     @State private var wantsNotifications = false
@@ -31,6 +32,9 @@ struct OnboardingFlow: View {
     /// The answer on the current step has been given and is rising into the question's place.
     /// Reset once the step it belonged to has finished leaving.
     @State private var submitted = false
+    /// Whether the surname field has the keyboard. Owned here so the first field's return key
+    /// can hand it over.
+    @FocusState private var lastFocused: Bool
 
     private enum Step: Int, CaseIterable {
         case welcome, name, age, look, permissions, friends, done
@@ -69,9 +73,17 @@ struct OnboardingFlow: View {
                 case .done: done
                 }
             }
+            // Up and down, not side to side.
+            //
+            // A horizontal slide is a pager: it says these screens sit beside each other and
+            // you can go back by swiping. This flow has no back — the age gate settles before
+            // anything is asked for, and a screen you cannot return to should not animate like
+            // one you can. Vertical reads as a single column being advanced, which is what it
+            // is, and it agrees with the answer rising into the question's place a moment
+            // earlier rather than fighting it.
             .transition(.asymmetric(
-                insertion: .move(edge: .trailing).combined(with: .opacity),
-                removal: .move(edge: .leading).combined(with: .opacity)
+                insertion: .move(edge: .bottom).combined(with: .opacity),
+                removal: .move(edge: .top).combined(with: .opacity)
             ))
         }
         .animation(Motion.surface, value: step)
@@ -100,19 +112,47 @@ struct OnboardingFlow: View {
         }
     }
 
+    /// Two fields, stacked, and only the first one is required.
+    ///
+    /// One box holding a whole name meant somebody typing "Alex Smith" got a handle with a
+    /// space in it, and somebody typing "Alex" got no surname at all with no way to tell which
+    /// they had meant. Two boxes ask the question the app actually has: the first name is what
+    /// people see, the surname is how you tell two Alexes apart.
+    ///
+    /// The surname is optional on purpose. A required surname is a form; this is an
+    /// introduction, and plenty of people give one name when they meet somebody.
     private var name: some View {
         OnboardingQuestion(
-            question: "What should we call you?",
+            question: "What's your name?",
             primary: "That's me",
-            canAdvance: cleanHandle.count >= 2,
-            footnote: "This is what people see when you're nearby.",
+            canAdvance: cleanFirst.count >= 2,
+            footnote: "The first one is what people see when you're nearby.",
             submitted: submitted
         ) {
             submitName()
         } answer: {
-            AnswerField(text: $handle, placeholder: "your name", limit: 20, submitted: submitted)
+            VStack(spacing: Space.tight) {
+                AnswerField(
+                    text: $firstName,
+                    placeholder: "First name",
+                    limit: 20,
+                    submitted: submitted,
+                    // Focused on arrival, and the return key hands over to the one below it
+                    // rather than dismissing the keyboard onto a half-answered screen.
+                    focusOnAppear: true,
+                    onSubmit: { lastFocused = true }
+                )
+
+                AnswerField(
+                    text: $lastName,
+                    placeholder: "Last name",
+                    limit: 20,
+                    submitted: submitted,
+                    focused: $lastFocused
+                )
+            }
         }
-        .debugAnswer($handle, for: "name", submit: submitName)
+        .debugAnswer($firstName, for: "name", submit: submitName)
     }
 
     private func submitName() {
@@ -294,8 +334,19 @@ struct OnboardingFlow: View {
     /// because the record it is written to is being created on these very screens.
     private var accentColour: Accent { Accent.at(accentChoice.wrappedValue) }
 
+    private var cleanFirst: String {
+        firstName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private var cleanLast: String {
+        lastName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    /// One handle, built from the two boxes. Joined without a separator rather than with a
+    /// dot or an underscore, because a handle is typed out loud by somebody standing next to
+    /// you -- "alexsmith" survives being said across a table and "alex.smith" does not.
     private var cleanHandle: String {
-        handle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        cleanLast.isEmpty ? cleanFirst : cleanFirst + cleanLast
     }
 
     private func advance(to next: Step) {
@@ -309,21 +360,19 @@ struct OnboardingFlow: View {
     /// rather than as a form advancing. `OnboardingQuestion` owns the geometry; this owns
     /// only the order.
     ///
-    /// The waits are not decoration, and neither of them is a round number by accident.
+    /// Neither wait is a round number by accident.
     ///
-    /// `submitted` puts the keyboard away immediately; the collapse is held back behind it by
-    /// `Rise.keyboardExit` (0.28s) and then runs for one `Motion.surface` (0.42s), so the rise
-    /// is not finished until 0.70s. The first wait has to clear that or the step transition
-    /// starts while the answer is still travelling -- which is the same collision the delay
-    /// exists to avoid, arriving from the other side. The second is longer than the
-    /// transition, so `submitted` clears only once the screen that owned the answer is gone;
-    /// reset any earlier and the outgoing view re-expands while it is still sliding away.
+    /// The rise itself is one `Motion.surface`, and the first wait clears it — start the step
+    /// transition early and the answer is still travelling when the screen changes. The second
+    /// is longer than the transition, so `submitted` clears only once the screen that owned
+    /// the answer has gone; reset any earlier and the outgoing view re-expands while it is
+    /// still sliding away.
     private func answerRises(then next: Step) {
         guard !Motion.reduceMotion else { return advance(to: next) }
 
         submitted = true
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(760))
+            try? await Task.sleep(for: .milliseconds(480))
             advance(to: next)
             try? await Task.sleep(for: .milliseconds(460))
             submitted = false

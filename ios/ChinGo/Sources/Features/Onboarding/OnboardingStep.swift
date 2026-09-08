@@ -97,13 +97,18 @@ struct OnboardingHero<Content: View>: View {
 /// Timings the question screen needs but cannot hold itself: `OnboardingQuestion` is generic
 /// over its answer, and a generic type cannot have a static stored property.
 private enum Rise {
-    /// How long to wait before the collapse starts.
+    /// How long the rise takes.
     ///
-    /// The keyboard's own dismissal is 0.25s and it animates the safe area, which moves the
-    /// whole question stack. A hand-rolled offset started in the same frame fights it: the
-    /// answer drops as the keyboard leaves and *then* slides up, which reads as a glitch
-    /// rather than as a lift. So focus is resigned first and this waits for it to be gone.
-    static let keyboardExit: Double = 0.28
+    /// There used to be a delay here, and a matching "resign focus first" in `AnswerField`,
+    /// because the keyboard's dismissal animates the safe area and moved the whole stack. The
+    /// answer is no longer to time around that — it is to not cause it. The keyboard stays up
+    /// through the rise and leaves when the step does, so the space this stack is centred in
+    /// does not change size while something inside it is moving.
+    ///
+    /// That reversal came from centring the block. While it was pinned near the top, the
+    /// keyboard leaving barely moved it and resigning focus early was harmless; centred, the
+    /// same dismissal drops the whole question by a keyboard's height mid-animation.
+    static let duration: Double = 0.42
 }
 
 /// One question, and the answer as the largest thing on screen.
@@ -133,7 +138,17 @@ struct OnboardingQuestion<Content: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0).frame(height: submitted ? Space.section : Space.section * 2)
+            // Centred in whatever space the keyboard leaves, rather than pinned near the top.
+            //
+            // A fixed head gap put the question a third of the way down and left a hand's
+            // width of empty paper under the answer, which reads as a form that has run out
+            // rather than as one question being asked. Bump's own screens sit the pair in the
+            // middle of the space above the keyboard, and the space above the keyboard is
+            // exactly what this stack is given.
+            //
+            // The collapse on submit now comes out of the gap *below* as well, so the rise
+            // still happens against a centred block instead of shifting the whole screen.
+            Spacer(minLength: Space.step)
 
             // The question sits directly above its answer rather than being pinned to the top
             // of the screen. A question at the top and an answer in the middle are two
@@ -153,6 +168,11 @@ struct OnboardingQuestion<Content: View>: View {
             answer()
                 .padding(.horizontal, Space.margin)
                 .padding(.top, submitted ? Space.tight : Space.section)
+                // The rise, now that the block is centred: the gaps above and below are equal
+                // and greedy, so collapsing the top one alone would only re-centre. Lifting
+                // the whole block by the height it gave up is what keeps the answer moving
+                // into the question's place rather than staying put.
+                .offset(y: submitted ? -Space.section : 0)
 
             Spacer(minLength: Space.step)
 
@@ -188,10 +208,7 @@ struct OnboardingQuestion<Content: View>: View {
         // One delayed animation over every value that reads `submitted`, rather than a
         // `withAnimation` at the call site: the delay is a property of this layout fighting
         // the keyboard, not of the decision to move on.
-        .animation(
-            Motion.reduceMotion ? nil : Motion.surface.delay(Rise.keyboardExit),
-            value: submitted
-        )
+        .animation(Motion.reduceMotion ? nil : Motion.surface, value: submitted)
     }
 }
 
@@ -204,10 +221,26 @@ struct AnswerField: View {
     var keyboard: UIKeyboardType = .default
     var limit: Int
     /// The answer has been given. Puts the keyboard away *before* the layout above starts
-    /// collapsing -- see `OnboardingQuestion.keyboardExit` for why the order matters.
+    /// collapsing -- see `Rise.keyboardExit` for why the order matters.
     var submitted: Bool = false
+    /// Whether this field takes the keyboard when it appears. False for anything sitting
+    /// under a field that already has it -- two fields both claiming focus on arrival is a
+    /// race, and the one that loses is whichever SwiftUI happens to build second.
+    var focusOnAppear: Bool = true
+    /// What the return key does. Nil leaves it dismissing the keyboard.
+    var onSubmit: (() -> Void)?
+    /// Focus owned by the caller, for a field something else has to be able to jump to.
+    var focused: FocusState<Bool>.Binding?
 
-    @FocusState private var focused: Bool
+    @FocusState private var ownFocus: Bool
+
+    /// Whichever focus this field is actually driven by.
+    private var isFocused: Bool {
+        get { focused?.wrappedValue ?? ownFocus }
+        nonmutating set {
+            if let focused { focused.wrappedValue = newValue } else { ownFocus = newValue }
+        }
+    }
 
     /// Digits only, derived from the keyboard rather than asked for separately.
     ///
@@ -225,7 +258,9 @@ struct AnswerField: View {
             .keyboardType(keyboard)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
-            .focused($focused)
+            .focused(focused ?? $ownFocus)
+            .submitLabel(onSubmit == nil ? .done : .next)
+            .onSubmit { onSubmit?() }
             .tint(accent.signal)
             .lineLimit(1)
             // Shrinks rather than truncating or scrolling. A name that scrolls out of its own
@@ -244,14 +279,17 @@ struct AnswerField: View {
                 // Guarded on `submitted` because the delay outlives the tap: a field that
                 // arrives and is answered inside 0.35s would otherwise take the keyboard
                 // back up underneath the rise.
+                guard focusOnAppear else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     guard !submitted else { return }
-                    focused = true
+                    isFocused = true
                 }
             }
-            .onChange(of: submitted) { _, done in
-                if done { focused = false }
-            }
+            // Deliberately does not resign focus on `submitted`. See `Rise`: the keyboard
+            // leaving resizes the space the question is centred in, and doing that while the
+            // answer is rising through it drops the whole block by a keyboard's height. The
+            // keyboard goes when the step does.
+
     }
 }
 

@@ -26,16 +26,34 @@ struct GlobeSharingSheet: View {
     var body: some View {
         SheetShell("Who can see you") {
             if friends.isEmpty {
+                // A designed state rather than a sentence lost in the middle of a blank
+                // sheet, which is what this was: `SheetShell` hands its content the full
+                // height, so two lines of text landed dead centre with a hand's width of
+                // white above and below them. That is the moment DESIGN.md means when it
+                // says an empty state is where an app looks most obviously like a database
+                // with no rows.
                 VStack(spacing: Space.tight) {
-                    Text("No friends yet.")
-                        .font(.chinBody)
+                    Spacer(minLength: Space.section)
+
+                    Image("Mascot")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 120)
+                        .shadow(color: Ink.text.opacity(0.18), radius: 0, x: 6, y: 6)
+                        .padding(.bottom, Space.step)
+
+                    // Gloria: this is the bear explaining, not the interface labelling.
+                    Text("Nobody to show yet.")
+                        .font(.chinHand)
                         .foregroundStyle(Ink.text)
                     Text("Catch somebody first — the globe only ever shows people you know.")
                         .font(.chinFootnote)
                         .foregroundStyle(Ink.textSoft)
                         .multilineTextAlignment(.center)
+
+                    Spacer(minLength: Space.step)
                 }
-                .padding(Space.margin)
+                .padding(.horizontal, Space.margin)
             } else {
                 ScrollView {
                     VStack(spacing: Space.snug) {

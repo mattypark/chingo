@@ -141,6 +141,13 @@ struct GlobeScreen: View {
         }
         .sheet(isPresented: $managing) {
             GlobeSharingSheet()
+                // Detents, because this sheet was presented at full height whatever it held.
+                // With a handful of friends that is a short list and a screen of white under
+                // it; with none it was two lines floating in the middle of nothing. Medium
+                // fits the common case and it drags up when the list is long enough to need it.
+                .presentationDetents([.medium, .large])
+                .presentationBackground(Ink.ground)
+                .presentationCornerRadius(30)
         }
         // On the pins arriving, not on appear. The query is still empty at the moment the
         // view appears, so an `onAppear` that reads `pins.first` always saw nothing and the
