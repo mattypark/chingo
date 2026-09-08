@@ -8,17 +8,15 @@ import ChinGoDesign
 /// well, and every one of them answers a question about getting somewhere -- which is not the
 /// question this screen exists for. What changes here is only how the Earth is drawn.
 enum GlobeLook: String, CaseIterable, Identifiable {
-    /// Flat, drawn, labelled. Closest to the rest of the app.
+    /// Our own style on MapLibre. Near-white paper, white roads, pale water.
     case map
-    /// Photographic, flat.
-    case satellite
-    /// Photographic, and an actual sphere on a starfield.
+    /// MapKit, far enough out to be a lit sphere on a starfield.
     case globe
 
-    /// Drawn, not photographed. Satellite imagery is somebody else's aesthetic dropped into
-    /// the middle of an app made of flat colour and hard outlines, and at the zoom people
-    /// actually use this at -- their own city -- it is also just harder to read. The sphere
-    /// is still one tap away for when the question is "where in the world".
+    /// Satellite used to be here and came off. It was somebody else's aesthetic dropped into
+    /// the middle of an app made of flat colour and hard outlines, and at the zoom this screen
+    /// is actually used at -- somebody's own city -- a photograph is harder to read than a
+    /// drawing. What is left is a real choice: the city, or the planet.
     static let fallback: GlobeLook = .map
 
     var id: String { rawValue }
@@ -26,7 +24,6 @@ enum GlobeLook: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .map: "Map"
-        case .satellite: "Satellite"
         case .globe: "Globe"
         }
     }
@@ -34,24 +31,22 @@ enum GlobeLook: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .map: "map.fill"
-        case .satellite: "photo.fill"
         case .globe: "globe.americas.fill"
         }
     }
 
-    /// **Only `.globe` uses realistic elevation, and only it is a sphere.** Flat elevation
-    /// renders the same imagery as an ordinary map however far out the camera goes -- no
-    /// curve, no starfield, no terminator. It is also the one that lets `MKAnnotationView`
-    /// work, which is why the friends on this screen are drawn as a SwiftUI overlay instead:
-    /// under realistic elevation MapKit never asks for an annotation view at all, so anything
-    /// relying on annotations would silently empty itself when somebody picked Globe.
+    /// Which renderer draws it. They are genuinely different engines, not two settings on one:
+    /// MapKit is the only one that can draw a sphere, and MapLibre is the only one whose
+    /// colours we control.
+    var isSphere: Bool { self == .globe }
+
+    /// MapKit's configuration, for the sphere. Realistic elevation is what makes it curve --
+    /// and is also why the friends on this screen are drawn as a SwiftUI overlay rather than
+    /// as annotations: under realistic elevation MapKit never asks for an annotation view at
+    /// all, with nothing logged.
     @MainActor
     var configuration: MKMapConfiguration {
-        switch self {
-        case .map: MKStandardMapConfiguration(elevationStyle: .flat)
-        case .satellite: MKImageryMapConfiguration(elevationStyle: .flat)
-        case .globe: MKHybridMapConfiguration(elevationStyle: .realistic)
-        }
+        MKHybridMapConfiguration(elevationStyle: .realistic)
     }
 }
 

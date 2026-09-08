@@ -107,6 +107,36 @@ public enum Ink {
     /// thing rather than as a narrower road.
     public static let mapPath = Color(hex: 0xEAF4F4)
 
+    // MARK: Flat map
+    //
+    // A second, quieter palette for the globe screen, where the map is a backdrop for people
+    // rather than a board you play on.
+    //
+    // The street map shouts on purpose: saturated green, dark ribbons, yellow edges, roads at
+    // two and a half times their cartographic width. All of that exists so the ground reads as
+    // a game surface at walking scale. Pull back to a city and the same choices become noise —
+    // there is nothing to play on at that zoom, only somewhere to find a face.
+    //
+    // So this one gets out of the way. Near-white paper, white roads with the faintest warm
+    // edge, pale water, and parks a suggestion rather than a statement. Everything saturated
+    // on this screen is a person.
+
+    public static let flatLand = Color(hex: 0xF2EFE9)
+    /// Blocks and parcels, barely a shade off the ground -- enough that a city reads as having
+    /// texture, not enough to be a classification.
+    public static let flatParcel = Color(hex: 0xEDE9E1)
+    public static let flatPark = Color(hex: 0xDCE8CD)
+    public static let flatParkDeep = Color(hex: 0xCFE0BC)
+    public static let flatWater = Color(hex: 0xBEE0F0)
+    /// White, and that is the whole trick. On a near-white ground the road network reads as a
+    /// negative space rather than as drawn lines -- which is why this kind of map looks calm
+    /// even when a city is dense.
+    public static let flatRoad = Color(hex: 0xFFFFFF)
+    /// A warm grey a hair darker than the paper. Present enough to give a road an edge,
+    /// quiet enough that a junction is not a diagram.
+    public static let flatRoadCasing = Color(hex: 0xE4DFD6)
+    public static let flatPath = Color(hex: 0xF7F5F1)
+
     /// The haze the ground fades into at the horizon. Effectively white with a cyan cast, and
     /// the same colour the sky bottoms out at, which is the whole trick -- see `Haze`.
     public static let mapHaze = Color(hex: 0xD0F9FF)

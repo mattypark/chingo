@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import MapLibre
 import CoreLocation
 import ChinGoDesign
 
@@ -218,10 +219,17 @@ struct GlobeMap: UIViewRepresentable {
 @MainActor
 @Observable
 final class GlobeProjection {
-    private weak var mapView: MKMapView?
+    /// Either renderer, because the globe screen has two: MapKit draws the sphere and MapLibre
+    /// draws the flat city, and the tokens over them are the same SwiftUI views either way.
+    /// Two weak references rather than a protocol -- the SDKs share no ancestry, and wrapping
+    /// two method calls in a protocol would be more machinery than the two method calls.
+    private weak var apple: MKMapView?
+    private weak var libre: MLNMapView?
     private(set) var tick = 0
 
-    func attach(_ map: MKMapView) { mapView = map }
+    func attach(_ map: MKMapView) { apple = map; libre = nil }
+
+    func attach(_ map: MLNMapView) { libre = map; apple = nil }
 
     func advance() { tick &+= 1 }
 
@@ -232,7 +240,15 @@ final class GlobeProjection {
     /// drawn on top of the Atlantic while the camera is over Portugal -- people floating over
     /// the wrong ocean, which is worse than not drawing them.
     func point(for coordinate: CLLocationCoordinate2D) -> CGPoint? {
-        guard let mapView else { return nil }
+        // A flat map has no far side, so there is no horizon test to do here -- only whether
+        // the point is on screen at all, which the caller's own clipping handles.
+        if let libre {
+            let point = libre.convert(coordinate, toPointTo: libre)
+            guard point.x.isFinite, point.y.isFinite else { return nil }
+            return point
+        }
+
+        guard let mapView = apple else { return nil }
 
         // Central angle between the camera's centre and the pin. Past a right angle the pin is
         // behind the horizon; 82 degrees rather than 90 so a token does not half-emerge from

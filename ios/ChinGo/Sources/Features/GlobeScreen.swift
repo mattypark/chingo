@@ -70,14 +70,25 @@ struct GlobeScreen: View {
     var body: some View {
         ZStack {
             if globeEnabled {
-                GlobeMap(
-                    pins: pins,
-                    fitToken: fitToken,
-                    projection: projection,
-                    look: look,
-                    focus: focus,
-                    focusToken: focusToken
-                )
+                Group {
+                    if look.isSphere {
+                        GlobeMap(
+                            pins: pins,
+                            fitToken: fitToken,
+                            projection: projection,
+                            look: look,
+                            focus: focus,
+                            focusToken: focusToken
+                        )
+                    } else {
+                        FlatGlobeMap(
+                            accent: accent,
+                            projection: projection,
+                            focus: focus,
+                            focusToken: focusToken
+                        )
+                    }
+                }
                 .overlay { tokens }
 
                 if pins.isEmpty { nobodyYet }

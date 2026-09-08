@@ -41,7 +41,47 @@ enum MapStyle {
     /// palette, because the generated style is still the warm paper one and every colour in it
     /// has to be replaced on the way in. When `build-style.py` catches up this shrinks back to
     /// the drift list -- see docs/HANDOFF-MAP-PALETTE.md.
-    private static var corrections: [String: Color] {
+    /// Which map this is being painted for.
+    ///
+    /// The two are not the same product surface and should not share numbers. The street map
+    /// is a board you play on at walking scale, so it shouts: saturated green, dark ribbons,
+    /// yellow edges, roads two and a half times their cartographic width. Pull back to a whole
+    /// city on the globe screen and every one of those choices becomes noise -- there is
+    /// nothing to play on at that zoom, only somebody to find.
+    enum Kind: String {
+        /// The game board. Green, loud, roads you could walk down.
+        case street
+        /// The backdrop on the globe screen. Near-white, quiet, everything saturated on it is
+        /// a person.
+        case flat
+    }
+
+    private static func corrections(for kind: Kind) -> [String: Color] {
+        switch kind {
+        case .street: streetCorrections
+        case .flat: flatCorrections
+        }
+    }
+
+    /// Near-white paper, white roads, pale water. Roads come out as negative space rather than
+    /// as drawn lines, which is why this kind of map stays calm even over a dense city.
+    private static var flatCorrections: [String: Color] {
+        [
+            "#EDE7D6": Ink.flatLand,
+            "#E9E2CF": Ink.flatParcel,
+            "#CFE0BC": Ink.flatPark,
+            "#A8D8D0": Ink.flatWater,
+            "#FFFDF7": Ink.flatRoad,
+            "#DDD5C2": Ink.flatRoadCasing,
+            "#F2EBDA": Ink.flatParcel,
+            "#EADEC8": Ink.flatParcel,
+            "#DCCDB2": Ink.flatParcel,
+            "#f2eae2": Ink.flatParcel,
+            "#dfdbd7": Ink.flatParcel,
+        ]
+    }
+
+    private static var streetCorrections: [String: Color] {
         [
             "#EDE7D6": Ink.mapLand,           // background
             // Was the generator's invented `land_alt`, and a bug when it was a darker warm
@@ -69,17 +109,17 @@ enum MapStyle {
     /// That has already cost one debugging session in this file. It is a named constant
     /// rather than a literal buried in a filename so that changing a transform and forgetting
     /// this are at least next to each other.
-    private static let styleVersion = 8
+    private static let styleVersion = 9
 
     /// A style file painted for this accent, written once and reused.
-    static func url(for accent: Accent) -> URL? {
+    static func url(for accent: Accent, kind: Kind = .street) -> URL? {
         guard let source = Bundle.main.url(forResource: "chingo-style", withExtension: "json") else {
             return nil
         }
 
         let destination = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("chingo-style-\(accent.id)-v\(styleVersion).json")
+            .appendingPathComponent("chingo-style-\(kind.rawValue)-\(accent.id)-v\(styleVersion).json")
 
         if FileManager.default.fileExists(atPath: destination.path) { return destination }
 
@@ -93,13 +133,20 @@ enum MapStyle {
             return source
         }
 
-        let table = swaps(for: accent)
+        let table = swaps(for: accent, kind: kind)
         let painted = deepenParks(
             solidPaths(
-                roundStreets(ribbonCasings(removeBuildings(widenStreets(repaint(root, using: table))))),
-                for: accent
+                roundStreets(
+                    ribbonCasings(
+                        removeBuildings(widenStreets(repaint(root, using: table), kind: kind)),
+                        kind: kind
+                    )
+                ),
+                for: accent,
+                kind: kind
             ),
-            for: accent
+            for: accent,
+            kind: kind
         )
 
         guard
@@ -112,15 +159,17 @@ enum MapStyle {
     }
 
     /// Every source colour mapped to its corrected, washed replacement.
-    private static func swaps(for accent: Accent) -> [String: String] {
-        corrections.reduce(into: [:]) { table, entry in
+    private static func swaps(for accent: Accent, kind: Kind) -> [String: String] {
+        corrections(for: kind).reduce(into: [:]) { table, entry in
             table[entry.key.lowercased()] = hex(accent.washing(entry.value))
         }
     }
 
     /// The colour the ground actually ends up. `MapScreen` paints this behind the map so the
     /// frame or two before tiles arrive is the same shade as the frame after.
-    static func ground(for accent: Accent) -> Color { accent.washing(Ink.mapLand) }
+    static func ground(for accent: Accent, kind: Kind = .street) -> Color {
+        accent.washing(kind == .street ? Ink.mapLand : Ink.flatLand)
+    }
 
     // MARK: Buildings
 
@@ -158,7 +207,14 @@ enum MapStyle {
     /// primary street is about 8% of the screen's width, where this basemap gives it 3%. With
     /// the buildings gone the road network is the only structure left on the ground, so it has
     /// to carry the whole map on its own, and at navigation widths it cannot.
-    private static let streetScale: Double = 2.6
+    private static func streetScale(for kind: Kind) -> Double {
+        switch kind {
+        case .street: 2.6
+        // Barely widened. On the flat map a road is a thing you look past, and the reference
+        // this is modelled on draws them at ordinary cartographic width.
+        case .flat: 1.15
+        }
+    }
 
     /// How wide the ribbon is, counting its edges, as a multiple of the carriageway.
     ///
@@ -167,7 +223,14 @@ enum MapStyle {
     /// width in yellow on each side. That is far heavier than any navigation style, where a
     /// casing is a hairline separating two roads rather than the edge of a physical object,
     /// and it is most of the difference between a map and a game board.
-    private static let casingRatio: Double = 1.38
+    private static func casingRatio(for kind: Kind) -> Double {
+        switch kind {
+        case .street: 1.38
+        // A hairline, not a ribbon. The yellow edge is a game decision; here the casing only
+        // has to stop two white roads merging into one white shape.
+        case .flat: 1.14
+        }
+    }
 
     /// Footpaths do not grow with the roads.
     ///
@@ -176,6 +239,7 @@ enum MapStyle {
     /// stop reading as pavements and start reading as a second, paler street network running
     /// parallel to the first.
     private static let pathScale: Double = 0.9
+
 
     /// Layers whose lines are not streets and must not grow with them.
     private static let notStreets = ["waterway", "boundary", "admin", "aeroway", "ferry", "rail"]
@@ -186,7 +250,7 @@ enum MapStyle {
     /// width, ...]` -- so only the output half of each stop is scaled. Multiplying the zoom
     /// stops as well would move where the roads change width rather than how wide they are,
     /// which looks like the map zooming on its own.
-    private static func widenStreets(_ root: Any) -> Any {
+    private static func widenStreets(_ root: Any, kind: Kind) -> Any {
         guard var document = root as? [String: Any],
               let layers = document["layers"] as? [[String: Any]] else { return root }
 
@@ -200,7 +264,7 @@ enum MapStyle {
             // Casings are not scaled here at all -- `ribbonCasings` overwrites them from the
             // road they wrap, which is the only way to get one ratio at every zoom and for
             // every class out of a style whose casing widths were each tuned by hand.
-            let scale = id.hasSuffix("-path") ? pathScale : streetScale
+            let scale = id.hasSuffix("-path") ? pathScale : streetScale(for: kind)
             var widened = layer
             for key in ["line-width", "line-gap-width"] {
                 guard let value = paint[key] else { continue }
@@ -223,7 +287,7 @@ enum MapStyle {
     ///
     /// So the casing stops being an independent number: it is the road's own width expression,
     /// multiplied. Run after `widenStreets`, so it inherits the widened road for free.
-    private static func ribbonCasings(_ root: Any) -> Any {
+    private static func ribbonCasings(_ root: Any, kind: Kind) -> Any {
         guard var document = root as? [String: Any],
               let layers = document["layers"] as? [[String: Any]] else { return root }
 
@@ -240,7 +304,7 @@ enum MapStyle {
                   var paint = layer["paint"] as? [String: Any]
             else { return layer }
 
-            paint["line-width"] = scaleOutputs(road, by: casingRatio)
+            paint["line-width"] = scaleOutputs(road, by: casingRatio(for: kind))
             var ribbon = layer
             ribbon["paint"] = paint
             return ribbon
@@ -312,11 +376,11 @@ enum MapStyle {
     ///    different kind of surface rather than as a thin road.
     /// 3. **The casing goes.** Paths are the one part of the network with no yellow edge,
     ///    which is what stops a pavement reading as a street.
-    private static func solidPaths(_ root: Any, for accent: Accent) -> Any {
+    private static func solidPaths(_ root: Any, for accent: Accent, kind: Kind) -> Any {
         guard var document = root as? [String: Any],
               let layers = document["layers"] as? [[String: Any]] else { return root }
 
-        let colour = hex(accent.washing(Ink.mapPath))
+        let colour = hex(accent.washing(kind == .street ? Ink.mapPath : Ink.flatPath))
 
         document["layers"] = layers.compactMap { layer -> [String: Any]? in
             guard let id = layer["id"] as? String, id.hasSuffix("-path") || id.hasSuffix("-path-casing")
@@ -339,11 +403,11 @@ enum MapStyle {
     /// which is fine on a navigation map where both are "green space" and neither is somewhere
     /// you go. Here the ground is already green, so the whole park family has to climb away
     /// from it, and a reserve that stops where a lawn stops has nothing left to say.
-    private static func deepenParks(_ root: Any, for accent: Accent) -> Any {
+    private static func deepenParks(_ root: Any, for accent: Accent, kind: Kind) -> Any {
         guard var document = root as? [String: Any],
               let layers = document["layers"] as? [[String: Any]] else { return root }
 
-        let colour = hex(accent.washing(Ink.mapParkDeep))
+        let colour = hex(accent.washing(kind == .street ? Ink.mapParkDeep : Ink.flatParkDeep))
 
         document["layers"] = layers.map { layer -> [String: Any] in
             guard layer["id"] as? String == "park", var paint = layer["paint"] as? [String: Any]
