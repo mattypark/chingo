@@ -55,34 +55,68 @@ public enum Ink {
 
     // MARK: Map
     //
-    // Green ground, dark road ribbons, no buildings. This is a deliberate break from the warm
-    // paper the rest of the app is made of, and the reason is that the map is not paper --
-    // it is the ground you are standing on, and the chrome floating over it is the paper.
-    // Cream cards on a green field separate cleanly; cream cards on a cream field needed a
-    // shadow to exist at all.
+    // Green ground, one road colour, one casing colour, no buildings. This is a deliberate
+    // break from the warm paper the rest of the app is made of, and the reason is that the map
+    // is not paper -- it is the ground you are standing on, and the chrome floating over it is
+    // the paper. Cream cards on a green field separate cleanly; cream cards on a cream field
+    // needed a shadow to exist at all.
+    //
+    // These are not invented. They are sampled off Pokemon GO's own shipped assets and
+    // full-resolution screenshots: the ramp textures the game indexes by distance
+    // (`GroundRamp.png`, `RoadRamp.png`, `RoadOutlineRamp.png`, `WaterGrad.png`) and pixel
+    // measurements of the near field, where the distance fog has not yet taken hold. Working
+    // from the near field matters -- the far field is already half sky, and matching *that*
+    // is what `Haze` does instead.
+    //
+    // Two of them are the ones that are easy to get wrong:
+    //
+    // - **The road is not neutral grey.** It is a desaturated teal, the same hue family as the
+    //   ground, 35 points darker and 40 less saturated. A true grey road on green reads as
+    //   pasted on; this one reads as part of the same world.
+    // - **The casing is yellow, and every road class gets it,** down to parking aisles. It is
+    //   the single loudest thing in the palette and it is what makes a road network read as
+    //   one connected object rather than as a classification. Hierarchy is carried by width
+    //   alone -- no class has its own hue.
     //
     // Exported to worker/style/chingo.json, and corrected on the way in by `MapStyle` while
     // the generator still emits the old palette.
 
     /// The ground. Everything that is not water, park or road.
-    public static let mapLand = Color(hex: 0x6FCB79)
-    /// Parks and grass -- a deeper green, so a park still reads as a park against ground that
-    /// is already green rather than disappearing into it.
-    public static let mapPark = Color(hex: 0x4FB162)
-    public static let mapWater = Color(hex: 0x56C2DC)
-    /// The carriageway. Dark and desaturated: on a green field the road is the one thing that
-    /// has to stay legible while walking, and a light road on light green does not.
-    public static let mapRoad = Color(hex: 0x4E6157)
-    /// The edge of the ribbon. Darker than the fill rather than lighter, so a road reads as a
-    /// solid object laid on the grass instead of an outline drawn on it.
-    public static let mapRoadCasing = Color(hex: 0x39493F)
+    public static let mapLand = Color(hex: 0xA4EFAC)
+    /// Land parcels -- residential, commercial, school, industrial. A few lightness points
+    /// off the ground and nothing more.
+    ///
+    /// This is the texture that replaces buildings. With the extrusions gone, the ground is
+    /// the largest flat area in the product by a wide margin, and a single uniform green reads
+    /// as felt. Parcel boundaries put low-frequency variation back into it without adding
+    /// anything you have to look at. Keep the hue within about eight degrees of `mapLand` --
+    /// past that the blocks start reading as a classification rather than as texture.
+    public static let mapLandParcel = Color(hex: 0x9CEEA9)
+    /// Parks and grass. A 40-point lightness step down from the ground rather than a nudge:
+    /// on a field that is already green, a park five percent darker reads as a rendering
+    /// artefact rather than as a park.
+    public static let mapPark = Color(hex: 0x3FA878)
+    /// Protected land and nature reserves -- darker again, so the two do not merge.
+    public static let mapParkDeep = Color(hex: 0x2E9668)
+    public static let mapWater = Color(hex: 0x25A0DB)
+    /// The carriageway, every class.
+    public static let mapRoad = Color(hex: 0x4E8E81)
+    /// The edge of the ribbon, every class.
+    public static let mapRoadCasing = Color(hex: 0xF6F49F)
+    /// Footpaths. Pale, solid and uncased -- the one part of the network drawn as a different
+    /// thing rather than as a narrower road.
+    public static let mapPath = Color(hex: 0xEAF4F4)
+
+    /// The haze the ground fades into at the horizon. Effectively white with a cyan cast, and
+    /// the same colour the sky bottoms out at, which is the whole trick -- see `Haze`.
+    public static let mapHaze = Color(hex: 0xD0F9FF)
 
     // Buildings are no longer drawn -- `MapStyle.removeBuildings` strips the layers. These
     // stay because the generated style still contains the colours and the correction table
     // still has to name something to map them to.
-    public static let mapBuilding = Color(hex: 0x64C070)
-    public static let mapBuildingWarm = Color(hex: 0x5CB868)
-    public static let mapBuildingSide = Color(hex: 0x4AA458)
+    public static let mapBuilding = Color(hex: 0x9CEEA9)
+    public static let mapBuildingWarm = Color(hex: 0xACEDB5)
+    public static let mapBuildingSide = Color(hex: 0x93E9A6)
 
     // MARK: Depth
     //

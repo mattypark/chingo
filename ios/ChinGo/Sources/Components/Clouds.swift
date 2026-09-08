@@ -80,34 +80,48 @@ struct Clouds: View {
     /// Sky colour, so clouds sit in the weather rather than on top of it.
     var tint: Color
 
+    /// Drawn margin outside the tiled area, on both sides.
+    ///
+    /// Wide enough for the largest puff plus its overhang. A canvas sized exactly to what it
+    /// tiles clips any shape that straddles its own boundary at full opacity, which is what
+    /// produced the straight vertical slice through a cloud -- the shape was not wrong, the
+    /// paper was too small. The vocabulary for this is a guard band, and the rule is that it
+    /// has to be at least the largest thing you draw.
+    private static let bleed: CGFloat = 170
+
+    /// Not pure white. The reference's cloud texture runs #DBFBFF to #F4FFFF -- white with a
+    /// cyan cast, which is what keeps a cloud sitting *in* a blue sky rather than punched
+    /// through it.
+    private static let paper = Color(hex: 0xEAFDFF)
+
+    /// How far the sky pulls the clouds toward its own colour. Small, but it is what stops a
+    /// cyan-white cloud sitting unchanged in an orange sunset -- weather is lit by the same
+    /// sky it hangs in.
+    private static let pull = 0.18
+
+    /// The cloud colour as the current sky lights it.
+    private var lit: Color { Self.paper.mix(with: tint, by: Self.pull) }
+
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 20, paused: Motion.reduceMotion)) { timeline in
             let minutes = timeline.date.timeIntervalSinceReferenceDate / 60
 
             GeometryReader { geo in
-                ZStack(alignment: .top) {
+                // Leading, not centre. Every deck is a canvas three screens wide positioned by
+                // its own offset, and a centred stack re-centres that canvas inside itself --
+                // which slid the whole tiled strip half a screen sideways and marched it clean
+                // off the window for part of every drift cycle. Clouds that exist, are drawn,
+                // and are nowhere on screen.
+                ZStack(alignment: .topLeading) {
                     ForEach(Array(Deck.allCases.enumerated()), id: \.offset) { _, deck in
                         deckView(deck, minutes: minutes, size: geo.size)
                     }
                 }
-                // Feathered at the left and right edges as well as the horizon. A cloud that
-                // simply stops at the screen edge reads as a torn sticker; one that thins out
-                // reads as weather continuing past the frame.
-                .mask {
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: .black, location: 0.06),
-                            .init(color: .black, location: 0.94),
-                            .init(color: .clear, location: 1),
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                }
-                // Clipped back to the screen only after the mask, so the overdrawn copies
-                // either side stay available to the feather instead of being cut first.
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+                // No horizontal feather. The strip genuinely wraps -- a cloud leaving the right
+                // edge is the same cloud arriving at the left -- so there is no seam for a
+                // feather to hide, and fading the edges only made the sky look vignetted. The
+                // axis that cannot wrap is the vertical one, and `SkyBand` already feathers it.
                 .clipped()
             }
         }
@@ -126,26 +140,22 @@ struct Clouds: View {
         // The canvas fills the whole band and the deck's altitude is applied to each puff
         // inside it. Giving each deck its own short frame clipped the puffs into a hard
         // horizontal line across the sky -- a seam where there should be weather.
-        // Three copies, one screen apart, drawn into a canvas a screen wider than the screen
-        // and offset back by half of that. A cloud crossing the edge is then always drawn
-        // whole by the neighbouring copy instead of being sliced by the canvas bounds -- which
-        // is what produced the straight vertical cut through a cloud at the edge of the map.
-        return Canvas { context, canvasSize in
-            // Copies at 0, W and 2W inside a canvas 3W wide, which the offset below shifts
-            // left by W. The middle copy then slides across the screen while its neighbours
-            // cover the gap at either end. Drawing them at -W, 0, +W instead put the whole
-            // thing off the left edge for most of the drift cycle -- clouds that existed and
-            // were never on screen.
+        return Canvas { context, _ in
+            // Three copies one screen apart, inside a canvas three screens wide plus a bleed
+            // margin at each end, shifted back by a screen and the margin. The middle copy
+            // slides across the window while its neighbours cover both ends, so the drift is
+            // a loop with no start and no join.
+            context.translateBy(x: Self.bleed, y: 0)
             for pass in 0...2 {
                 let step = CGFloat(pass) * size.width
                 context.translateBy(x: step, y: 0)
-                draw(deck, in: &context, size: CGSize(width: size.width, height: canvasSize.height))
+                draw(deck, in: &context, size: CGSize(width: size.width, height: band))
                 context.translateBy(x: -step, y: 0)
             }
         }
-        .frame(width: size.width * 3, height: band)
-        .offset(x: offset - size.width)
-        .foregroundStyle(.white)
+        .frame(width: size.width * 3 + Self.bleed * 2, height: band, alignment: .topLeading)
+        .offset(x: offset - size.width - Self.bleed)
+        .foregroundStyle(lit)
         // Plain alpha, not plusLighter. Additive white over a blue sky is fine and over a
         // cream street is a smear -- and the mask that keeps them off the street is a
         // gradient, so there is always a band where both are true.
@@ -164,7 +174,7 @@ struct Clouds: View {
             let drift = (generator.next() - 0.5) * 0.12
             let y = (Double(deck.height) + drift) * Double(size.height)
             let width = (26 + generator.next() * 34) * deck.scale
-            context.fill(puff(at: CGPoint(x: x, y: y), width: width), with: .color(.white))
+            context.fill(puff(at: CGPoint(x: x, y: y), width: width), with: .color(lit))
         }
     }
 

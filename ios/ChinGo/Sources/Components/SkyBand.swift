@@ -32,7 +32,9 @@ struct SkyBand: View {
     /// map opens at. Measured off the render rather than derived -- the projection depends on
     /// pitch, zoom and field of view together, and a number read off the thing it has to
     /// match is more honest than three approximations multiplied.
-    private static let horizon: CGFloat = 0.30
+    /// Shared with `Haze`, which has to start exactly where this ends. Two files disagreeing
+    /// about where the horizon is would show up as a seam across the middle of the screen.
+    static let horizon: CGFloat = 0.30
 
     init(latitude: Double, longitude: Double, bearing: Double) {
         self.latitude = latitude

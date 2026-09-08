@@ -1,0 +1,21 @@
+name = "chingo-presence"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+# SUPABASE_URL is a var. SUPABASE_SERVICE_ROLE_KEY (and SUPABASE_JWT_SECRET, only on an older
+# project that still signs with HS256) are secrets:
+#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+# Locally they come from .dev.vars, which is gitignored; copy .dev.vars.example.
+[vars]
+SUPABASE_URL = ""
+
+[[durable_objects.bindings]]
+name = "REGION"
+class_name = "Region"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Region"]
+
+[observability]
+enabled = true
