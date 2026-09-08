@@ -74,6 +74,13 @@ struct MapScreen: View {
         return absolute - camera.bearing
     }
 
+    /// How much of the right edge the nearby rail owns. Nothing on the map is drawn into it.
+    private static let railColumn: CGFloat = 150
+    /// The furthest a memory pin will step aside to stay out of that column. About its own
+    /// width -- far enough to clear a graze, not far enough to leave a stem pointing at the
+    /// horizon.
+    private static let railNudge: CGFloat = 46
+
     /// How far from a bear's middle a tap still counts as landing on it. Wider than the
     /// character, because at this zoom a bear is about 44 points tall and a thumb is not
     /// precise -- and the only thing a near miss can do is open the wrong card, which is one
@@ -593,6 +600,15 @@ struct MapScreen: View {
             default: break
             }
 
+            if DemoSeed.tour == "rail" {
+                // Steps the focus down the rail, which is the only way to see the face hand
+                // itself from one name to the next -- there is no scrub gesture from here.
+                for step in 1...3 {
+                    try? await Task.sleep(for: .milliseconds(1400))
+                    withAnimation(Motion.tap) { focusedNearby = step }
+                }
+            }
+
             if DemoSeed.tour == "reveal" {
                 try? await Task.sleep(for: .milliseconds(1500))
                 if let somebody = state.nearby.first(where: canReveal) { open(somebody) }
@@ -698,10 +714,29 @@ struct MapScreen: View {
                 if let point = projection.point(
                     for: CLLocationCoordinate2D(latitude: memory.latitude, longitude: memory.longitude)
                 ), geo.frame(in: .local).insetBy(dx: -60, dy: -60).contains(point) {
-                    MemoryBubble(memory: memory) { openMemory = memory }
-                        // Anchored at its foot, like the bears, so a pin sits on the spot
-                        // rather than hovering with the spot at its middle.
-                        .position(x: point.x, y: point.y - 30)
+                    // Nudged out from under the nearby rail, and only that far.
+                    //
+                    // The rail is a fixed column of names hard against the right edge, and a
+                    // polaroid landing inside it covers whichever name it lands on -- which
+                    // is the one the rail is focused on more often than chance, because both
+                    // things cluster around the middle of the screen. Moving the card and
+                    // leaving the stem pointing at the true spot keeps the memory where it
+                    // happened; only the picture of it steps aside.
+                    let clear = geo.size.width - Self.railColumn - MemoryBubble.width / 2
+                    let x = min(point.x, clear)
+
+                    // Nudged only so far. Clamping without a limit turned the stem into a
+                    // wire reaching a third of the way across the screen for any memory that
+                    // happened to be well inside the rail's column -- which reads as the
+                    // polaroid being tethered to something rather than standing on it. Past
+                    // the limit the picture is simply not drawn: the memory is still there,
+                    // still resurfaces, and walking a few steps brings it back on screen.
+                    if point.x - x <= Self.railNudge {
+                        MemoryBubble(memory: memory, stemOffset: point.x - x) { openMemory = memory }
+                            // Anchored at its foot, like the bears, so a pin sits on the spot
+                            // rather than hovering with the spot at its middle.
+                            .position(x: x, y: point.y - 30)
+                    }
                 }
             }
         }

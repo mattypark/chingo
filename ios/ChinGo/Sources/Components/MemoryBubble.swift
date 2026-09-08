@@ -6,7 +6,14 @@ import ChinGoDesign
 /// Drawn as a small polaroid rather than a pin: a pin says "a place", and this says "a day".
 struct MemoryBubble: View {
     let memory: MemoryRecord
+    /// How far the spot it belongs to sits from the middle of the polaroid, once the polaroid
+    /// has been nudged out from under the nearby rail. The stem follows the spot; the card
+    /// does not -- the same arrangement `RevealCard` uses to stay clear of the screen edge.
+    var stemOffset: CGFloat = 0
     let action: () -> Void
+
+    /// Outside width, so the caller can nudge one without guessing.
+    static let width: CGFloat = 48
 
     @State private var bob = false
 
@@ -51,12 +58,18 @@ struct MemoryBubble: View {
                 // leaving it floating over the map. 3pt and solid ink: the 1.5pt translucent
                 // version was a hairline next to a 3pt outline, which is the exact pairing
                 // the sticker language exists to stop.
-                Rectangle()
-                    .fill(Ink.text)
-                    .frame(width: 3, height: 14)
+                // Leans toward the spot when the polaroid has been moved off it, so the line
+                // still lands on the ground rather than hanging straight down beside it.
+                Path { path in
+                    path.move(to: CGPoint(x: 1.5, y: 0))
+                    path.addLine(to: CGPoint(x: 1.5 + stemOffset, y: 14))
+                }
+                .stroke(Ink.text, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .frame(width: 3, height: 14)
                 Circle()
                     .fill(Ink.text)
                     .frame(width: 7, height: 7)
+                    .offset(x: stemOffset)
             }
             .offset(y: bob ? -3 : 0)
         }

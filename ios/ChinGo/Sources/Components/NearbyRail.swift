@@ -1,6 +1,44 @@
 import SwiftUI
 import ChinGoDesign
 
+/// The face of whoever is in focus, out to the left of their name.
+///
+/// The same object as the one on the reveal card -- their picture if they set one, otherwise
+/// their bear in their own colour, ringed in 3pt ink. A different treatment here would make
+/// the person you are scrubbing through and the person the card is about look like two
+/// different people.
+private struct RailPortrait: View {
+    let person: NearbyPerson
+
+    /// Matched to the focused name's cap height rather than to the row, so it reads as sitting
+    /// beside the word instead of as a button the word is attached to.
+    private static let size: CGFloat = 34
+
+    var body: some View {
+        Group {
+            if let image = PhotoStore.load(person.portraitFile) {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill)
+            } else if let bear = BearIcons.all[BearIcons.name(accent: person.accent, phase: nil)] {
+                // Their bear, in their colour -- the same generated set the map draws them
+                // with. The stock berry mascot was the obvious fallback and the wrong one:
+                // five people with no picture would all be the same bear on five different
+                // discs, which reads as five copies of one person.
+                Image(uiImage: bear).resizable().scaledToFit().padding(1)
+            } else {
+                Image("Mascot").resizable().scaledToFit().padding(2)
+            }
+        }
+        .frame(width: Self.size, height: Self.size)
+        .background(Circle().fill(Accent.at(person.accent).signal))
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Ink.text, lineWidth: 3))
+        // The hard offset every other object in this language throws. Without it the face is
+        // the one thing on the map with no weight under it.
+        .shadow(color: Ink.text, radius: 0, x: 2, y: 2)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Who is around, down the right edge.
 ///
 /// The structure is lifted from GOAT's level rail: names stacked against the right margin,
@@ -85,23 +123,45 @@ struct NearbyRail: View {
             ForEach(Array(listed.enumerated()), id: \.element.id) { index, person in
                 let distance = abs(index - clampedFocus)
 
-                Text(person.handle)
-                    .font(.custom(Typeface.gloria, size: size(at: distance)))
-                    .foregroundStyle(colour(at: distance))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .overlay(alignment: .bottom) {
-                        // The mark for "this one". A rule, not a chip: a filled shape out
-                        // here competes with the map behind it, and the map is the product.
-                        Rectangle()
-                            .fill(accent.signal)
-                            .frame(height: 3)
-                            .offset(y: 3)
-                            .opacity(distance == 0 ? 1 : 0)
+                HStack(spacing: Space.tight) {
+                    // Only on the one in focus, and it arrives from the left.
+                    //
+                    // The rail is hard against the right edge, so a face on the *left* of the
+                    // focused name is the one direction with room to come from -- it slides
+                    // out of the margin rather than out from under its neighbour. Moving to
+                    // another name takes it back the same way and puts a new one out on the
+                    // new row, which reads as the list handing the face along.
+                    if distance == 0 {
+                        RailPortrait(person: person)
+                            .transition(
+                                .asymmetric(
+                                    insertion: .move(edge: .leading).combined(with: .opacity),
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                )
+                            )
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture { move(to: index) }
-                    .accessibilityAddTraits(distance == 0 ? [.isButton, .isSelected] : .isButton)
+
+                    Text(person.handle)
+                        .font(.custom(Typeface.gloria, size: size(at: distance)))
+                        .foregroundStyle(colour(at: distance))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .overlay(alignment: .bottom) {
+                            // The mark for "this one". A rule, not a chip: a filled shape out
+                            // here competes with the map behind it, and the map is the product.
+                            Rectangle()
+                                .fill(accent.signal)
+                                .frame(height: 3)
+                                .offset(y: 3)
+                                .opacity(distance == 0 ? 1 : 0)
+                        }
+                }
+                // Clipped to its own row, so the face slides out of the row's own left edge
+                // instead of appearing whole in the middle of the map.
+                .clipped()
+                .contentShape(Rectangle())
+                .onTapGesture { move(to: index) }
+                .accessibilityAddTraits(distance == 0 ? [.isButton, .isSelected] : .isButton)
             }
         }
         .animation(Motion.reduceMotion ? nil : Motion.tap, value: clampedFocus)
