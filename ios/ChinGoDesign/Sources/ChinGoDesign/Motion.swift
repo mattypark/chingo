@@ -35,6 +35,15 @@ public enum Motion {
     // Idle life on the map. Long, unsynchronised, never demanding attention.
 
     public static let breathe = Animation.easeInOut(duration: 2.6).repeatForever(autoreverses: true)
+
+    /// A signal going out and not coming back. Radar, ripples, anything that leaves.
+    ///
+    /// Deliberately not `breathe`, and the difference is the whole point: `breathe`
+    /// autoreverses, so a ring driven by it grows and then *shrinks back into the middle*,
+    /// which reads as a thing inflating and deflating rather than as something being sent.
+    /// Linear rather than eased for the same reason -- a pulse that slows as it travels reads
+    /// as running out of energy, and this one is meant to keep going.
+    public static let emit = Animation.linear(duration: 2.4).repeatForever(autoreverses: false)
     public static let drift = Animation.easeInOut(duration: 7.0).repeatForever(autoreverses: true)
 
     /// One guarded read of the system setting, so UIKit never leaks into a view file and

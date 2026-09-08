@@ -265,6 +265,13 @@ struct MapScreen: View {
                 pitch: camera.pitch
             )
 
+            RadarPulse(
+                centre: location.coordinateOrFallback,
+                projection: projection,
+                discoverable: state.discoverable
+            )
+            .ignoresSafeArea()
+
             memoryLayer
             PlayerPuck(
                 level: state.level,
