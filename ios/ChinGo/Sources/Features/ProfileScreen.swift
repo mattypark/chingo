@@ -341,6 +341,22 @@ struct IdentityEditor: View {
                 .tint(accent.signal)
                 .padding(.top, Space.step)
 
+                // Its own switch, not a sub-setting of the one above. This never leaves the
+                // app, needs no permission and costs no battery, so somebody who declined
+                // push should not silently lose it too.
+                Toggle(isOn: $record.wantsMemoryNudges) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Mention memories as I walk past")
+                            .font(.chinBody)
+                            .foregroundStyle(Ink.text)
+                        Text("On the map only, once a day at most per place.")
+                            .font(.chinFootnote)
+                            .foregroundStyle(Ink.textSoft)
+                    }
+                }
+                .tint(accent.signal)
+                .padding(.top, Space.snug)
+
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, Space.margin)
@@ -351,6 +367,7 @@ struct IdentityEditor: View {
         // A colour change has to survive the sheet being dismissed by a swipe, and it has to
         // reach the map behind it immediately, so it commits on the tap rather than on exit.
         .onChange(of: record.bannerTint) { _, _ in try? context.save() }
+        .onChange(of: record.wantsMemoryNudges) { _, _ in try? context.save() }
         .onChange(of: record.wantsDevelopAlerts) { _, wants in
             try? context.save()
             Task {

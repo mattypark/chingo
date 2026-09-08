@@ -16,6 +16,7 @@ struct MapScreen: View {
     @Environment(\.modelContext) private var context
     @Query private var memories: [MemoryRecord]
     @Query private var catches: [CatchRecord]
+    @Query private var me: [MeRecord]
 
     let location: LocationService
 
@@ -42,6 +43,8 @@ struct MapScreen: View {
     /// Bumped when somebody new comes into range, so the haptic fires on the crossing rather
     /// than on every frame they stay there.
     @State private var reveals = 0
+    /// The memory currently being mentioned, if any. See `MemoryNudge`.
+    @State private var nudge: MemoryRecord?
     /// The photo currently flying into the album, if any.
     @State private var flying: UIImage?
     @State private var flown = false
@@ -155,6 +158,48 @@ struct MapScreen: View {
         GeoCell(latitude: here.lat, longitude: here.lon).id
     }
 
+    /// Whether walking past a memory is allowed to say anything. On unless turned off, and
+    /// absent only before onboarding has written a record.
+    private var wantsNudges: Bool { me.first?.wantsMemoryNudges ?? true }
+
+    /// How long a nudge stays on screen before it takes itself away.
+    ///
+    /// Long enough to read twice while walking, short enough that it is gone before it turns
+    /// into part of the furniture. It is also dismissible, so this is the ceiling rather than
+    /// the expected lifetime.
+    private static let nudgeLifetime: Duration = .seconds(8)
+
+    /// Look for something worth mentioning, and mention at most one thing.
+    ///
+    /// Called on every cell change rather than on every fix. A fix arrives every 25 metres and
+    /// re-running the whole candidate list that often would be work for nothing -- the radius
+    /// is 150 metres, so nothing can become eligible inside one cell that was not eligible at
+    /// the edge of it.
+    private func lookForAMemory() {
+        guard wantsNudges, nudge == nil else { return }
+
+        let candidates = memories.map { memory in
+            Resurface.Candidate(
+                id: memory.id,
+                metres: Geo.metres(from: here, to: (memory.latitude, memory.longitude)),
+                happenedOn: memory.happenedOn,
+                lastSurfaced: memory.lastSurfaced
+            )
+        }
+
+        guard let picked = Resurface.pick(from: candidates),
+              let memory = memories.first(where: { $0.id == picked.id })
+        else { return }
+
+        // Stamped when it is shown, not when it is opened. The cooldown is about how often
+        // this is allowed to interrupt, and it interrupted whether or not you did anything
+        // about it.
+        memory.lastSurfaced = .now
+        try? context.save()
+
+        withAnimation(Motion.surface) { nudge = memory }
+    }
+
     /// Memories close enough to be worth drawing. The same radius that decides whether one
     /// resurfaces, so what you see on the map and what taps you on the shoulder agree.
     private var visibleMemories: [MemoryRecord] {
@@ -219,6 +264,22 @@ struct MapScreen: View {
 
             VStack(spacing: 0) {
                 topBar
+
+                // Under the top bar rather than over the map's middle. It is an aside, and an
+                // aside that lands on top of where you are standing is not an aside.
+                if let nudge {
+                    MemoryNudge(
+                        memory: nudge,
+                        onOpen: {
+                            openMemory = nudge
+                            withAnimation(Motion.surface) { self.nudge = nil }
+                        },
+                        onDismiss: { withAnimation(Motion.surface) { self.nudge = nil } }
+                    )
+                    .padding(.top, Space.tight)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 Spacer(minLength: Space.step)
                 NearbyRail(people: state.nearby, focused: $focusedNearby)
                     // The rail and the card answer the same question at different scales --
@@ -308,6 +369,28 @@ struct MapScreen: View {
             }
         }
         .background(MapStyle.ground(for: accent))
+        // Cell, not coordinate. A fix lands every 25 metres and the radius is 150, so nothing
+        // can become eligible inside one cell that was not already eligible at its edge --
+        // running the whole candidate list six times a block would be work for nothing.
+        //
+        // `initial` matters more than it looks: without it the only trigger is crossing a cell
+        // boundary, so opening the app while standing on the spot where something happened --
+        // which is most of the times this should fire -- said nothing at all until you walked
+        // a block and came back.
+        .onChange(of: cell, initial: true) { _, _ in lookForAMemory() }
+        // And again when the store finishes loading, because on a cold launch the query is
+        // still empty at the moment the first check runs. Catching somebody also lands here
+        // and is deliberately harmless: a memory made seconds ago is inside `minimumAge` and
+        // cannot be picked.
+        .onChange(of: memories.count) { _, _ in lookForAMemory() }
+        .task(id: nudge?.id) {
+            // Takes itself away. A strip that only leaves when you deal with it stops being an
+            // aside and becomes something you have to deal with.
+            guard nudge != nil else { return }
+            try? await Task.sleep(for: Self.nudgeLifetime)
+            guard !Task.isCancelled else { return }
+            withAnimation(Motion.surface) { nudge = nil }
+        }
         #if DEBUG
         // Re-place the demo people once a real fix lands, not on appear. On appear the
         // coordinate is still the fallback, so seeding there put them in Dolores Park however

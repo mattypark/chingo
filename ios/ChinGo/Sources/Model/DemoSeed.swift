@@ -225,6 +225,10 @@ enum DemoSeed {
         // Memories scattered a few hundred metres out, so the map has something to place
         // and the distance maths is exercised rather than assumed.
         let pins: [(String, String, Double, Double, Int)] = [
+            // Deliberately inside the 150 m resurfacing radius and well past the twelve-hour
+            // floor, so the memory nudge is something you can see on launch rather than
+            // something you have to go for a walk to trigger. Every other pin is outside it.
+            ("wren",  "the crosswalk",  0.0004,  0.0003, 9),
             ("sunny", "Dolores Park",   0.0016, -0.0011, 1_100),
             ("jae",   "the ramen place", -0.0009,  0.0018, 260),
             ("mira",  "Ocean Beach",     0.0021,  0.0009, 640),

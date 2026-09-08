@@ -140,6 +140,18 @@ final class MeRecord {
     /// that only govern push while the app is closed are the reason people say notification
     /// settings do nothing.
     var wantsDevelopAlerts: Bool = true
+
+    /// Whether walking past an old memory is allowed to mention it.
+    ///
+    /// A default value rather than an optional, which is what makes this a lightweight
+    /// migration -- an existing install picks it up without a schema version.
+    ///
+    /// Separate from `wantsDevelopAlerts` because they are different promises. That one is a
+    /// push, arriving on a phone in a pocket; this one only ever happens with the app open and
+    /// in your hand, so it needs no permission and costs no battery. Folding them into one
+    /// switch would mean somebody who declined push also silently lost a feature that never
+    /// involved push.
+    var wantsMemoryNudges: Bool = true
     var ageTier: Int
 
     /// When onboarding was completed. Nil means it has not been.
