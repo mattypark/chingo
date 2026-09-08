@@ -95,8 +95,11 @@ struct ProfileScreen: View {
     /// finished the moment the account exists.
     private var banner: some View {
         ZStack(alignment: .bottom) {
+            // The player's colour, not the mascot's. Berry is the bear's own colour and it
+            // belongs to full-screen takeovers; on a profile it just meant every player's
+            // page was purple regardless of the colour they chose on the first screen.
             LinearGradient(
-                colors: [Ink.berryDeep, Ink.berry],
+                colors: [accent.signalDeep, accent.signal],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
