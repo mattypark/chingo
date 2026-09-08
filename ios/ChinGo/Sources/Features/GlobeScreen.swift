@@ -121,16 +121,24 @@ struct GlobeScreen: View {
     /// The friends, drawn over the globe rather than into it. See `GlobeProjection`.
     private var tokens: some View {
         GeometryReader { _ in
-            ForEach(pins) { pin in
-                if let point = projection.point(for: pin.coordinate) {
-                    GlobeToken(pin: pin, showsName: true) { selected = pin }
-                        .position(x: point.x, y: point.y)
+            // `tick` is read here, inside the `GeometryReader`, and the `.id` hangs on this
+            // inner stack rather than on the whole layer.
+            //
+            // It used to be on the outside, which meant `body` itself took a dependency on a
+            // counter that advances on every frame of every camera move -- so a pinch
+            // re-walked the friends query, rebuilt the map representable and tore down every
+            // token sixty times a second. Scoping it keeps the one thing that has to be
+            // recomputed, which is where each token sits.
+            ZStack {
+                ForEach(pins) { pin in
+                    if let point = projection.point(for: pin.coordinate) {
+                        GlobeToken(pin: pin, showsName: true) { selected = pin }
+                            .position(x: point.x, y: point.y)
+                    }
                 }
             }
+            .id(projection.tick)
         }
-        // Reading `tick` is what re-places these as the planet turns. Without it they are
-        // placed once and then sit still while the world spins underneath them.
-        .id(projection.tick)
     }
 
     /// Everyone visible, along the bottom. Tap to fly.
@@ -140,8 +148,18 @@ struct GlobeScreen: View {
     private var faces: some View {
         Group {
             if pins.count > 1 {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Space.tight) {
+                // An `HStack`, not a `ScrollView`, and that is a bug fix rather than a
+                // simplification. A `ScrollView` is greedy: it accepts the whole size it is
+                // offered, and an overlay offers the map's entire frame. So this laid out at
+                // full screen, and a `UIScrollView` claims every touch inside its bounds
+                // regardless of having no background -- which is why the globe could not be
+                // pinched or panned, and why tapping a friend's token did nothing either.
+                //
+                // It was gated on `pins.count > 1`, so the bug only appeared once you had two
+                // friends sharing. With one, zoom worked fine.
+                //
+                // Nothing is lost: this is a handful of friends, not a feed.
+                HStack(spacing: Space.tight) {
                         ForEach(pins) { pin in
                             Button {
                                 focus = pin
@@ -154,13 +172,20 @@ struct GlobeScreen: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Fly to \(pin.handle)")
                         }
-                    }
-                    .padding(.horizontal, Space.margin)
-                    .padding(.top, Space.tight)
-                    // Clear of Apple's attribution, which is not optional -- the maps legal
-                    // notice has to stay visible and unobstructed.
-                    .padding(.bottom, Space.section + Space.step)
                 }
+                // A tray, not loose tokens. Without a surface behind them these read as three
+                // more people standing in the Atlantic -- identical objects to the ones
+                // actually pinned on the map, in a place nobody is.
+                .padding(.horizontal, Space.snug)
+                .padding(.vertical, Space.tight)
+                .background(Capsule().fill(Ink.groundRaised))
+                .overlay(Capsule().strokeBorder(Ink.text, lineWidth: 3))
+                .compositingGroup()
+                .shadow(color: Ink.text, radius: 0, x: Sticker.drop, y: Sticker.drop)
+                .padding(.horizontal, Space.margin)
+                // Clear of Apple's attribution, which is not optional -- the maps legal
+                // notice has to stay visible and unobstructed.
+                .padding(.bottom, Space.section + Space.step)
             }
         }
     }
