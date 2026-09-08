@@ -46,6 +46,9 @@ struct MapScreen: View {
     @State private var reveals = 0
     /// The memory currently being mentioned, if any. See `MemoryNudge`.
     @State private var nudge: MemoryRecord?
+    /// Bumped per memory surfaced, to hang the haptic on. A counter rather than the memory's
+    /// own id, because that also changes on the way out and would buzz on dismissal.
+    @State private var nudges = 0
     /// The photo currently flying into the album, if any.
     @State private var flying: UIImage?
     @State private var flown = false
@@ -143,10 +146,16 @@ struct MapScreen: View {
         // Reading `tick` is what re-runs this as the camera moves. Without it the card is
         // placed once and then sits still while the map slides underneath it.
         .id(projection.tick)
-        .feedback(.pick, on: reveals)
+        // `.arrive` rather than `.pick`. Somebody walking into range is a physical event, and
+        // `.pick` is the lightest thing in the vocabulary -- the same buzz a list row gets.
+        .feedback(.arrive, on: reveals)
         .onChange(of: revealed?.id) { previous, next in
             revealedID = next
-            if next != nil, next != previous { reveals += 1 }
+            // Only on entering an empty ring. Bumping this whenever the *nearest* person
+            // changes means walking between two people who are both already inside it buzzes
+            // you again, which is a notification about arithmetic rather than about anybody
+            // arriving.
+            if next != nil, previous == nil { reveals += 1 }
         }
     }
 
@@ -198,6 +207,7 @@ struct MapScreen: View {
         memory.lastSurfaced = .now
         try? context.save()
 
+        nudges += 1
         withAnimation(Motion.surface) { nudge = memory }
     }
 
@@ -392,6 +402,9 @@ struct MapScreen: View {
         // boundary, so opening the app while standing on the spot where something happened --
         // which is most of the times this should fire -- said nothing at all until you walked
         // a block and came back.
+        // `.arrive` is the case whose own doc comment names "a memory surfacing", and this is
+        // the path it was written for.
+        .feedback(.arrive, on: nudges)
         .onChange(of: cell, initial: true) { _, _ in lookForAMemory() }
         // And again when the store finishes loading, because on a cold launch the query is
         // still empty at the moment the first check runs. Catching somebody also lands here
