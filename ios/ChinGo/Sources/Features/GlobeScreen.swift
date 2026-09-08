@@ -39,6 +39,9 @@ struct GlobeScreen: View {
     /// exit runs backwards through: it drops before `onClose`, so the globe's own chrome is
     /// gone before the screen is taken away.
     @State private var appeared = false
+    /// How far through being drawn this screen's chrome is. Four pieces: the layers button,
+    /// the pause pill, the faces tray and the bottom bar.
+    private var drawn: DrawnScreen { DrawnScreen(appeared ? 1 : 0, pieces: 2) }
     /// Who the camera is looking at, and a counter so tapping the same person twice flies
     /// back to them rather than doing nothing.
     @State private var focus: GlobePin?
@@ -132,7 +135,10 @@ struct GlobeScreen: View {
         // which is the whole illusion -- the ground changes, the stickers come off.
         .opacity(appeared ? 1 : 0)
         .task {
-            withAnimation(Motion.tap) { appeared = true }
+            // `Motion.draw`, not a surface spring: the chrome is being drawn on, and the
+            // curve has to be the same one the reveal card uses or the app has two different
+            // ideas of how long a thing takes to appear.
+            withAnimation(Motion.reduceMotion ? nil : Motion.draw) { appeared = true }
         }
         .onChange(of: leaveOn) { _, _ in leave() }
         .sheet(item: $selected) { pin in
@@ -318,7 +324,7 @@ struct GlobeScreen: View {
                 cell(icon: "map.fill", label: "Map", enabled: true) { leave() }
             }
             .frame(height: 74)
-            .sticker(fill: Ink.groundRaised, radius: Radius.surface)
+            .drawnSticker(fill: Ink.groundRaised, radius: Radius.surface, drawn: drawn.piece(1))
             .padding(.horizontal, Space.margin)
             .padding(.trailing, Sticker.drop)
             .padding(.bottom, Space.section)
@@ -341,9 +347,9 @@ struct GlobeScreen: View {
     private func leave() {
         guard !Motion.reduceMotion else { return onClose() }
 
-        withAnimation(Motion.dismiss) { appeared = false }
+        withAnimation(Motion.erase) { appeared = false }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(310))
+            try? await Task.sleep(for: .milliseconds(340))
             onClose()
         }
     }

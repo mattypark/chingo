@@ -159,6 +159,51 @@ public extension View {
 /// *away* from the card — a frame that animates its height grows from wherever its alignment
 /// puts it, and getting that to read as reaching down took more guessing than drawing the line
 /// outright does.
+/// A whole screen's worth of chrome being drawn, one piece at a time.
+///
+/// The single-object version is `Drawn`. This is the same four beats spread across several
+/// objects: each piece has a `rank`, and its own gesture starts one `Motion.stagger` behind
+/// the piece in front of it and finishes inside the same overall progress.
+///
+/// Compressing rather than delaying is what keeps a five-piece screen from taking five times
+/// as long as a one-piece one. Every rank still gets the full four beats — it just gets them
+/// in a narrower window, and the windows overlap so the screen reads as being drawn in one
+/// pass rather than as five drawings queued up.
+public struct DrawnScreen: Equatable, Sendable {
+    public let progress: Double
+    /// How many pieces there are. Sets how much of the whole gesture each one gets.
+    public let pieces: Int
+
+    public init(_ progress: Double, pieces: Int) {
+        self.progress = min(max(progress, 0), 1)
+        self.pieces = max(1, pieces)
+    }
+
+    /// How far through its own drawing the piece at `rank` is.
+    ///
+    /// The last piece finishes exactly at 1, so nothing is still being drawn when the screen
+    /// is considered done — a stagger that runs past the end leaves the bottom bar half-drawn
+    /// at the moment the next thing is allowed to happen.
+    public func piece(_ rank: Int) -> Drawn {
+        let rank = min(max(rank, 0), pieces - 1)
+        // Each piece is given a window that starts a fraction later and ends at 1. With one
+        // piece that is the whole gesture, which is what makes this collapse to `Drawn`.
+        //
+        // Remapped linearly, deliberately not smoothstepped. `Drawn`'s own four beats are
+        // already eased and the animation curve driving this is a third — easing here as well
+        // put three curves in series, which drags the middle of every piece and makes the
+        // screen feel slower than the numbers say it is.
+        let lead = Double(rank) / Double(pieces) * Self.spread
+        return Drawn((progress - lead) / (1 - lead))
+    }
+
+    /// How much of the whole gesture is given over to staggering rather than to drawing.
+    ///
+    /// Half. All of it and the last piece only begins as the first finishes, which is a queue;
+    /// none of it and every piece moves together, which is the fade this replaced.
+    static let spread: Double = 0.5
+}
+
 public struct DrawnStem: View, Animatable {
     private let length: CGFloat
     private var drawn: Drawn

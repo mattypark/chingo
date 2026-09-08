@@ -93,3 +93,60 @@ struct DrawnTests {
         #expect(Drawn.eased(0.6, from: 0.5, to: 0.5) == 1)
     }
 }
+
+/// A screen's worth of chrome, drawn one piece at a time.
+@Suite("Drawn screen")
+struct DrawnScreenTests {
+
+    @Test("Blank and complete are blank and complete for every piece")
+    func endsAreClean() {
+        let blank = DrawnScreen(0, pieces: 4)
+        let done = DrawnScreen(1, pieces: 4)
+        for rank in 0..<4 {
+            #expect(blank.piece(rank).isBlank)
+            #expect(done.piece(rank).progress == 1)
+        }
+    }
+
+    @Test("Each piece is behind the one in front of it")
+    func piecesAreStaggered() {
+        // Halfway through, the first piece must be further along than the last -- that gap is
+        // the entire effect, and without it this is a fade with more code.
+        let half = DrawnScreen(0.5, pieces: 4)
+        let steps = (0..<4).map { half.piece($0).progress }
+        for (earlier, later) in zip(steps, steps.dropFirst()) {
+            #expect(earlier > later)
+        }
+    }
+
+    @Test("Every piece finishes by the end, not after it")
+    func nothingIsLeftHalfDrawn() {
+        // A stagger that runs past 1 leaves the last piece mid-stroke at the moment the
+        // screen is considered done, and whatever happens next happens over the top of it.
+        let done = DrawnScreen(1, pieces: 6)
+        #expect(done.piece(5).progress == 1)
+    }
+
+    @Test("One piece is the same thing as drawing one object")
+    func collapsesToDrawn() {
+        // With nothing to stagger against, this has to behave exactly like `Drawn` -- if it
+        // does not, a single-piece screen draws on a different curve from a card.
+        for step in stride(from: 0.0, through: 1.0, by: 0.1) {
+            #expect(abs(DrawnScreen(step, pieces: 1).piece(0).progress - step) < 0.0001)
+        }
+    }
+
+    @Test("A rank outside the screen is clamped rather than extrapolated")
+    func rankIsClamped() {
+        let screen = DrawnScreen(0.5, pieces: 3)
+        #expect(screen.piece(-2).progress == screen.piece(0).progress)
+        #expect(screen.piece(99).progress == screen.piece(2).progress)
+    }
+
+    @Test("The stagger takes up part of the gesture, not all of it")
+    func spreadIsPartial() {
+        // All of it and the last piece only starts as the first finishes, which is a queue.
+        #expect(DrawnScreen.spread > 0)
+        #expect(DrawnScreen.spread < 1)
+    }
+}

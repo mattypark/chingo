@@ -29,6 +29,9 @@ struct HomeBar: View {
     /// Bumped by the owner when a hold commits, so the reward beat and haptic land there.
     var catchPulse: Int
 
+    /// How far through being drawn the bar is. `.complete` is a plain sticker.
+    var drawn: Drawn = .complete
+
     var onProfile: () -> Void
     var onCatch: () -> Void
     var onCatchHold: () -> Void
@@ -53,6 +56,10 @@ struct HomeBar: View {
                     action: onCatch,
                     longPress: onCatchHold
                 )
+                // The catch button is its own object standing proud of the slab, so it goes
+                // with the slab's contents rather than being drawn round -- a circle stroking
+                // itself on beside a box stroking itself on is two drawings, not one.
+                .opacity(drawn.content)
                 .rewardBeat(on: catchPulse)
                 .feedback(.caught, on: catchPulse)
                 .offset(y: -Self.lift)
@@ -71,7 +78,7 @@ struct HomeBar: View {
             globeCell
         }
         .frame(height: Self.height)
-        .sticker(fill: Ink.groundRaised, radius: Radius.surface)
+        .drawnSticker(fill: Ink.groundRaised, radius: Radius.surface, drawn: drawn)
     }
 
     /// 3pt, in ink, like every other line in this language. A hairline here would be a

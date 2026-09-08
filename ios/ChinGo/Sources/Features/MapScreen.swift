@@ -28,6 +28,10 @@ struct MapScreen: View {
     @State private var showCatch = false
     @State private var showAlbum = false
     @State private var showGlobe = false
+    /// How far through being drawn the map's own chrome is: gone while the globe is open,
+    /// drawn back on the way out. Two pieces, and the home bar is the second so it is the
+    /// last thing to arrive and the first to go.
+    private var mapChrome: DrawnScreen { DrawnScreen(showGlobe ? 0 : 1, pieces: 2) }
     @State private var showStreak = false
     /// Bumped by `-tour globe` to make the globe leave the way a thumb would. Always zero
     /// outside a debug run.
@@ -479,7 +483,10 @@ struct MapScreen: View {
                 NearbyRail(people: state.nearby, focused: $focusedNearby)
                     .pops(hidden: showGlobe, rank: 1)
                 Spacer(minLength: Space.step)
-                bottomBar.pops(hidden: showGlobe, rank: 2)
+                // Not a pop. The home bar is the largest printed object on the screen, so
+                // it is the one that most obviously *is* drawn -- and un-drawing it is what
+                // makes leaving read as the crayon coming off rather than as the bar shrinking.
+                bottomBar
             }
             .padding(.horizontal, Space.inset)
             .padding(.bottom, Space.margin)
@@ -525,7 +532,7 @@ struct MapScreen: View {
             // the globe's own map fades in, and without an opaque floor the first frames of
             // that fade are two maps at once.
             if showGlobe {
-                GlobeScreen(onClose: { showGlobe = false }, leaveOn: globeLeaves)
+                GlobeScreen(onClose: { withAnimation(Motion.draw) { showGlobe = false } }, leaveOn: globeLeaves)
                     .background(Ink.ground.ignoresSafeArea())
                     .zIndex(1)
             }
@@ -641,7 +648,7 @@ struct MapScreen: View {
 
             if DemoSeed.tour == "globe" {
                 try? await Task.sleep(for: .milliseconds(1600))
-                showGlobe = true
+                withAnimation(Motion.erase) { showGlobe = true }
                 try? await Task.sleep(for: .milliseconds(2400))
                 // Through the screen's own way out rather than by flipping the flag, so what
                 // gets filmed is the exit a thumb would produce.
@@ -861,6 +868,7 @@ struct MapScreen: View {
             daysSinceMeetup: state.daysSinceMeetup,
             canCatch: state.canCatch,
             catchPulse: catchPulse,
+            drawn: mapChrome.piece(1),
             onProfile: {
                 // Straight to the profile. A menu in front of your own profile is a step
                 // that exists only to show the menu.
