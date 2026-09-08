@@ -120,9 +120,13 @@ public enum Sky {
     }
 
     private static let stops: [Stop] = [
-        Stop(altitude:  60, high: Color(hex: 0x8FBCE4), low: Color(hex: 0xCFE3F0)),
-        Stop(altitude:  30, high: Color(hex: 0x93BEE3), low: Color(hex: 0xD8E7F0)),
-        Stop(altitude:  10, high: Color(hex: 0xA6C3DE), low: Color(hex: 0xE6E7E2)),
+        // Daylight is deliberately more saturated than a photograph of a sky. This is a toy
+        // city with a bear standing in it -- a naturalistic grey-blue overhead made the whole
+        // thing look overcast. Twilight and night below are left alone: they already read
+        // well, and the solar maths that drives them is what the tests cover.
+        Stop(altitude:  60, high: Color(hex: 0x4FA8E8), low: Color(hex: 0xB8DEF2)),
+        Stop(altitude:  30, high: Color(hex: 0x5CAFE9), low: Color(hex: 0xC2E3F3)),
+        Stop(altitude:  10, high: Color(hex: 0x86C0E2), low: Color(hex: 0xDCE9E6)),
         Stop(altitude:   6, high: Color(hex: 0xB4C1D6), low: Color(hex: 0xF0DEC0)),
         Stop(altitude:   2, high: Color(hex: 0xB09FC0), low: Color(hex: 0xF6C79A)),
         Stop(altitude:   0, high: Color(hex: 0x9A83B4), low: Color(hex: 0xF2A874)),

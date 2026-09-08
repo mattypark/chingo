@@ -48,22 +48,17 @@ struct SkyBand: View {
             ZStack(alignment: .top) {
                 LinearGradient(colors: [band.high, band.low], startPoint: .top, endPoint: .bottom)
                     .frame(height: geo.size.height * Self.reach)
-                    .mask {
-                        // Solid most of the way down and then off quickly. A long even fade
-                        // dissolves the far buildings into the sky and the horizon stops
-                        // being anywhere; holding it opaque to two thirds keeps a line there
-                        // for the ground to end at.
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black, location: 0),
-                                .init(color: .black, location: 0.62),
-                                .init(color: .black.opacity(0.55), location: 0.82),
-                                .init(color: .clear, location: 1),
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
+                    .mask { horizonMask }
+
+                Clouds(bearing: bearing, reach: Self.reach, tint: band.high)
+                    .frame(height: geo.size.height * Self.reach)
+                    // The same horizon the gradient uses. Without it the low deck drifts on
+                    // past the skyline and ends up as pale blobs lying across the street,
+                    // which reads as a rendering fault rather than as weather.
+                    .mask { horizonMask }
+                    // Behind the sun, so the sun burns through them rather than sitting on
+                    // top like a sticker.
+                    .opacity(cloudOpacity)
 
                 if let place = sunPlacement(in: geo.size) {
                     sunDisc.position(place)
@@ -83,6 +78,27 @@ struct SkyBand: View {
                 try? await Task.sleep(for: .seconds(60))
             }
         }
+    }
+
+    /// Where the sky stops and the ground begins.
+    ///
+    /// Solid most of the way down and then off quickly. A long even fade dissolves the far
+    /// buildings into the sky and the horizon stops being anywhere; holding it opaque to two
+    /// thirds keeps a line there for the ground to end at.
+    ///
+    /// Shared by the gradient and the clouds, because two different horizons on one screen is
+    /// two skies.
+    private var horizonMask: some View {
+        LinearGradient(
+            stops: [
+                .init(color: .black, location: 0),
+                .init(color: .black, location: 0.62),
+                .init(color: .black.opacity(0.55), location: 0.82),
+                .init(color: .clear, location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     // MARK: The sun
@@ -165,6 +181,17 @@ struct SkyBand: View {
                 .opacity(duskOpacity)
         }
         .allowsHitTesting(false)
+    }
+
+    /// Clouds fade out after dark rather than sitting there as white shapes on a night sky.
+    /// They are still there at dusk, catching the last of the colour, which is the best they
+    /// ever look.
+    private var cloudOpacity: Double {
+        switch sun.altitude {
+        case 4...: 1
+        case -6 ..< 4: (sun.altitude + 6) / 10
+        default: 0
+        }
     }
 
     /// Nothing at midday, most through golden hour, easing off once the colour has gone.
