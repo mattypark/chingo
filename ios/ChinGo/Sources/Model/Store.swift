@@ -25,6 +25,29 @@ final class FriendRecord {
     var move: String
     var portraitFile: String?
 
+    // MARK: Globe
+    //
+    // Two grants, stored separately, both defaulting to false so an existing friend picks up
+    // the feature switched off rather than switched on. `ChinGoEngine.GlobeSharing` owns what
+    // they mean; these only record what was agreed.
+
+    /// They may see where you are.
+    var iShareWith: Bool = false
+    /// You may see where they are.
+    var theyShareWithMe: Bool = false
+
+    /// Their last known position, as the backend last sent it. Nil until it does.
+    ///
+    /// Held as three loose optionals rather than a struct because SwiftData migrates added
+    /// optional properties without a schema version, and this has to land on installs that
+    /// already exist.
+    var globeLatitude: Double?
+    var globeLongitude: Double?
+    var globeUpdatedAt: Date?
+
+    /// Which bear to draw for them on the globe. Their accent, by index.
+    var accentIndex: Int = 0
+
     /// Denormalised bond counters. The tier itself is never stored: it is derived by
     /// `ChinGoEngine.Bond`, so the ladder can be retuned without a migration and can never
     /// drift out of sync with the numbers it came from.
@@ -152,6 +175,16 @@ final class MeRecord {
     /// switch would mean somebody who declined push also silently lost a feature that never
     /// involved push.
     var wantsMemoryNudges: Bool = true
+
+    // MARK: Globe
+    //
+    // Both default to the safe answer. `globeEnabled` false means a person who never opens
+    // the feature is not in it, and `sharingPaused` exists so leaving is one tap that does
+    // not require revoking anybody -- see `GlobeSharing`, where pausing is deliberately
+    // indistinguishable from a flat battery.
+
+    var globeEnabled: Bool = false
+    var sharingPaused: Bool = false
 
     /// A face, if you want one. Optional in every sense: the type, the product decision, and
     /// the migration.

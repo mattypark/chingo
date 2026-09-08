@@ -166,6 +166,12 @@ enum DemoSeed {
                     onboardedAt: .now
                 )
             )
+            // Switched on for the demo only. The real default is off, and the invitation
+            // screen it produces is reachable with -globeOff -- a state worth being able to
+            // screenshot, because for a fresh install it is the *normal* one.
+            if let identity = (try? context.fetch(FetchDescriptor<MeRecord>()))?.first {
+                identity.globeEnabled = !ProcessInfo.processInfo.arguments.contains("-globeOff")
+            }
             try? context.save()
         }
 
@@ -199,6 +205,19 @@ enum DemoSeed {
              "", ["met once, at a bus stop"]),
         ]
 
+        // Where each of them is on the globe, and whether both sides have said yes.
+        //
+        // Deliberately mixed: two who are visible, one who has only agreed in one direction,
+        // and one with no position at all. That is the state the screen has to look right in
+        // -- the version where everybody is sharing is the version that hides every bug in
+        // the consent rule.
+        let globe: [String: (lat: Double, lon: Double, hoursAgo: Double, mine: Bool, theirs: Bool, accent: Int)] = [
+            "sunny": (37.5665, 126.9780, 0.4, true, true, 3),
+            "mira": (38.7223, -9.1393, 2.5, true, true, 5),
+            "jae": (37.7749, -122.4194, 1.0, true, false, 1),
+            "toby": (0, 0, 0, false, false, 6),
+        ]
+
         for (handle, city, meetups, places, daysAgo, top5, move, traits) in people {
             let friend = FriendRecord(
                 handle: handle,
@@ -210,6 +229,16 @@ enum DemoSeed {
                 distinctPlaceCount: places,
                 mutualTopFive: top5
             )
+            if let where_ = globe[handle] {
+                friend.accentIndex = where_.accent
+                friend.iShareWith = where_.mine
+                friend.theyShareWithMe = where_.theirs
+                if where_.mine || where_.theirs {
+                    friend.globeLatitude = where_.lat
+                    friend.globeLongitude = where_.lon
+                    friend.globeUpdatedAt = .now.addingTimeInterval(-3600 * where_.hoursAgo)
+                }
+            }
             context.insert(friend)
             context.insert(
                 CatchRecord(

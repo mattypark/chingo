@@ -28,6 +28,7 @@ struct MapScreen: View {
     @State private var deckMenu = false
     @State private var showCatch = false
     @State private var showAlbum = false
+    @State private var showGlobe = false
     @State private var showAddFriend = false
     @State private var showMyHandle = false
     @State private var catchPulse = 0
@@ -325,6 +326,7 @@ struct MapScreen: View {
                         RadialOption(icon: "person.badge.plus", label: "Add someone") { showAddFriend = true },
                         RadialOption(icon: "at", label: "My handle") { showMyHandle = true },
                         RadialOption(icon: "square.grid.2x2.fill", label: "Album") { showAlbum = true },
+                        RadialOption(icon: "globe", label: "Globe") { showGlobe = true },
                     ],
                     onClose: { deckMenu = false }
                 )
@@ -429,6 +431,7 @@ struct MapScreen: View {
             case "profile": showProfile = true
             case "catch": catchMenu = true
             case "deck": deckMenu = true
+            case "globe": showGlobe = true
             default: break
             }
             #endif
@@ -479,6 +482,9 @@ struct MapScreen: View {
             MyHandleSheet()
                 .presentationDetents([.height(470)])
                 .presentationCornerRadius(30)
+        }
+        .fullScreenCover(isPresented: $showGlobe) {
+            GlobeScreen()
         }
         .sheet(isPresented: $showAlbum) {
             AlbumScreen()
