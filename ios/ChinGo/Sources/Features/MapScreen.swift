@@ -264,11 +264,14 @@ struct MapScreen: View {
             memoryLayer
             PlayerPuck(
                 level: state.level,
-                progress: state.levelProgress,
                 // Walks when you are walking. `course` is only published above a walking
                 // threshold, so standing still is a genuine idle rather than a frozen
                 // walk frame -- the same rule every other bear on the map is drawn by.
-                phase: location.course == nil ? nil : walkPhase
+                phase: location.course == nil ? nil : walkPhase,
+                // The direction you are actually walking, held while you stand still so the
+                // bear does not spin to face the phone every time the camera turns.
+                heading: location.course,
+                cameraBearing: camera.bearing
             )
 
             VStack(spacing: 0) {
