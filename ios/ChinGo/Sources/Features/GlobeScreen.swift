@@ -23,7 +23,13 @@ struct GlobeScreen: View {
 
     @State private var selected: GlobePin?
     @State private var fitToken = 0
-    @State private var ready = 0
+    @State private var projection = GlobeProjection()
+    @AppStorage("globeLook") private var look: GlobeLook = .globe
+    @State private var pickingLook = false
+    /// Who the camera is looking at, and a counter so tapping the same person twice flies
+    /// back to them rather than doing nothing.
+    @State private var focus: GlobePin?
+    @State private var focusToken = 0
     @State private var managing = false
 
     private var identity: MeRecord? { me.first }
@@ -64,15 +70,31 @@ struct GlobeScreen: View {
         SheetShell {
             ZStack(alignment: .top) {
                 if globeEnabled {
-                    GlobeMap(pins: pins, accent: accent, fitToken: fitToken, ready: $ready) { selected = $0 }
-                        .ignoresSafeArea(edges: .horizontal)
+                    GlobeMap(
+                        pins: pins,
+                        fitToken: fitToken,
+                        projection: projection,
+                        look: look,
+                        focus: focus,
+                        focusToken: focusToken
+                    )
+                    .ignoresSafeArea(edges: .horizontal)
+                    .overlay { tokens }
+                    .overlay(alignment: .bottom) { faces }
 
                     if pins.isEmpty { nobodyYet }
                 } else {
                     invitation
                 }
 
-                header
+                VStack(alignment: .leading, spacing: Space.tight) {
+                    header
+                    if pickingLook {
+                        GlobeLookBar(selection: $look)
+                            .padding(.horizontal, Space.margin)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
             }
         }
         .sheet(item: $selected) { pin in
@@ -82,15 +104,82 @@ struct GlobeScreen: View {
         .sheet(isPresented: $managing) {
             GlobeSharingSheet()
         }
-        .onAppear { fitToken += 1 }
+        // On the pins arriving, not on appear. The query is still empty at the moment the
+        // view appears, so an `onAppear` that reads `pins.first` always saw nothing and the
+        // camera never moved.
+        .onChange(of: pins.count, initial: true) { _, _ in
+            // Opens on somebody rather than on an empty planet. Framing everybody is the
+            // honest default only when everybody fits, and on a sphere they often cannot --
+            // an opening shot of the Pacific with all your friends over the horizon looks
+            // like the feature is broken.
+            guard focus == nil, let first = pins.first else { return }
+            focus = first
+            focusToken += 1
+        }
+    }
+
+    /// The friends, drawn over the globe rather than into it. See `GlobeProjection`.
+    private var tokens: some View {
+        GeometryReader { _ in
+            ForEach(pins) { pin in
+                if let point = projection.point(for: pin.coordinate) {
+                    GlobeToken(pin: pin, showsName: true) { selected = pin }
+                        .position(x: point.x, y: point.y)
+                }
+            }
+        }
+        // Reading `tick` is what re-places these as the planet turns. Without it they are
+        // placed once and then sit still while the world spins underneath them.
+        .id(projection.tick)
+    }
+
+    /// Everyone visible, along the bottom. Tap to fly.
+    ///
+    /// Find My's list, reduced to faces because these are already tokens rather than rows and
+    /// a name is repeated under each one on the globe itself.
+    private var faces: some View {
+        Group {
+            if pins.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Space.tight) {
+                        ForEach(pins) { pin in
+                            Button {
+                                focus = pin
+                                focusToken += 1
+                            } label: {
+                                GlobeToken(pin: pin, showsName: false) {}
+                                    .allowsHitTesting(false)
+                                    .opacity(focus?.id == pin.id ? 1 : 0.72)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Fly to \(pin.handle)")
+                        }
+                    }
+                    .padding(.horizontal, Space.margin)
+                    .padding(.top, Space.tight)
+                    // Clear of Apple's attribution, which is not optional -- the maps legal
+                    // notice has to stay visible and unobstructed.
+                    .padding(.bottom, Space.section + Space.step)
+                }
+            }
+        }
     }
 
     private var header: some View {
         HStack(spacing: Space.tight) {
-            Text("Globe")
-                .font(.chinTitle)
-                .foregroundStyle(Ink.text)
-                .shadow(color: Ink.groundRaised, radius: 0, x: 2, y: 2)
+            // The title is gone and the layer picker has its place. On a screen that is
+            // entirely one map, a word naming the screen is the least useful thing that could
+            // occupy the corner -- you know where you are, and what you might want is to
+            // change what you are looking at.
+            Button { withAnimation(Motion.surface) { pickingLook.toggle() } } label: {
+                Image(systemName: pickingLook ? "xmark" : "square.3.layers.3d")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Ink.text)
+                    .frame(width: 40, height: 40)
+            }
+            .buttonStyle(StickerCircleStyle(fill: Ink.groundRaised))
+            .hitTarget()
+            .accessibilityLabel("Change how the map looks")
 
             Spacer()
 
@@ -245,5 +334,43 @@ private struct GlobePinCard: View {
         if minutes < 60 { return "About \(minutes) minutes ago" }
         let hours = Int((pin.age / 3600).rounded())
         return hours == 1 ? "About an hour ago" : "About \(hours) hours ago"
+    }
+}
+
+/// One friend on the globe: their bear in a ring, with their handle under it.
+///
+/// A circle rather than a teardrop pin. A pin points at a building; on a globe the honest
+/// claim is "somewhere around here", and a round token makes that claim without implying a
+/// precision the position does not have.
+private struct GlobeToken: View {
+    let pin: GlobePin
+    var showsName: Bool = true
+    var onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 2) {
+                Group {
+                    if let bear = BearIcons.all[BearIcons.name(accent: pin.accent, phase: nil)] {
+                        Image(uiImage: bear).resizable().scaledToFit().padding(4)
+                    }
+                }
+                .frame(width: 46, height: 46)
+                .background(Circle().fill(Accent.at(pin.accent).signalLift))
+                .overlay(Circle().strokeBorder(Ink.text, lineWidth: 3))
+
+                if showsName {
+                Text(pin.handle)
+                    .font(.custom(Typeface.bagel, size: 12))
+                    .foregroundStyle(Ink.text)
+                    // A hard cream offset rather than a blurred halo, so the label still
+                    // belongs to this app while sitting on a photograph of the Pacific.
+                    .shadow(color: Ink.groundRaised, radius: 0, x: 1.5, y: 1.5)
+                    .lineLimit(1)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(pin.handle), on the globe")
     }
 }

@@ -27,14 +27,14 @@ struct SkyBand: View {
     @State private var sun: Sky.Position
 
     /// How much of the screen the haze reaches down.
-    private static let reach: CGFloat = 0.36
+    private static let reach: CGFloat = 0.30
     /// Where the horizon sits, as a fraction of screen height, at the raked-back pitch the
     /// map opens at. Measured off the render rather than derived -- the projection depends on
     /// pitch, zoom and field of view together, and a number read off the thing it has to
     /// match is more honest than three approximations multiplied.
     /// Shared with `Haze`, which has to start exactly where this ends. Two files disagreeing
     /// about where the horizon is would show up as a seam across the middle of the screen.
-    static let horizon: CGFloat = 0.30
+    static let horizon: CGFloat = 0.24
 
     init(latitude: Double, longitude: Double, bearing: Double) {
         self.latitude = latitude

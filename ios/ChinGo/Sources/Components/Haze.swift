@@ -35,6 +35,7 @@ struct Haze: View {
     /// `SkyBand`'s problem, and doubling the two would double-tint the strip where they meet.
     private static let ramp: [(location: CGFloat, alpha: Double)] = [
         (SkyBand.horizon, 0.42),
+        (0.270, 0.400),
         (0.310, 0.386),
         (0.378, 0.287),
         (0.436, 0.219),
