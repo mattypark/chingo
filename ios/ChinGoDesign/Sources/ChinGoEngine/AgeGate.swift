@@ -52,6 +52,23 @@ public enum AgeGate {
         age(bornOn: birthdate, asOf: now, calendar: calendar) >= minimumAge ? .adult : .tooYoung
     }
 
+    /// The gate, from an age somebody typed rather than a date they picked.
+    ///
+    /// Weaker than `tier(bornOn:)` and worth being honest about. A date is the pattern
+    /// regulators treat as good faith, because it is a fact about the world rather than an
+    /// answer to a question. An age typed into a box is a step down from that.
+    ///
+    /// It is still a long way above the thing that actually fails, which is "Are you 16 or
+    /// over?" -- that tells you which answer unlocks the app and therefore measures nothing.
+    /// A number entry reveals no threshold, and what gets stored is the same tier either way,
+    /// so nothing extra is retained by taking it.
+    ///
+    /// Nonsense is not adulthood. A negative or absurd number is `tooYoung`, so a stray
+    /// keypress cannot open the gate.
+    public static func tier(age: Int) -> AgeTier {
+        (minimumAge...130).contains(age) ? .adult : .tooYoung
+    }
+
     /// The oldest date the picker should allow — today. A gate is not a place to be clever
     /// about the future.
     public static func latestSelectableBirthdate(asOf now: Date = .now) -> Date { now }

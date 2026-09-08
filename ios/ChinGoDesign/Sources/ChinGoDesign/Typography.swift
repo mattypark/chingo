@@ -26,6 +26,13 @@ public extension Font {
     static let chinDisplay = Font.custom(Typeface.bagel, size: 40, relativeTo: .largeTitle)
     /// A level, a catch count, an XP number. The figures that want to feel like a score.
     static let chinNumeral = Font.custom(Typeface.bagel, size: 28, relativeTo: .title)
+    /// What somebody just typed, on a screen that asks one question.
+    ///
+    /// Bigger than the wordmark on purpose. When the question is small and grey at the top and
+    /// the answer is the largest thing on screen, the screen stops looking like a form and
+    /// starts looking like a conversation -- the answer is the content, and the field is not
+    /// there at all. Below about 40pt the effect collapses and it reads as a heading again.
+    static let chinAnswer = Font.custom(Typeface.bagel, size: 46, relativeTo: .largeTitle)
     /// Button lids: CATCH, SNAP, RECONNECT. Two words at most.
     static let chinShout = Font.custom(Typeface.bagel, size: 17, relativeTo: .headline)
 
