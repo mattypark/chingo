@@ -179,7 +179,10 @@ struct ProfileScreen: View {
             Divider().frame(height: 28)
             stat("\(friends.count)", friends.count == 1 ? "person" : "people")
             Divider().frame(height: 28)
-            stat("\(state.streakWeeks)", state.streakWeeks == 1 ? "week" : "weeks")
+            // Days, matching the pill on the map. The week count still exists in the engine
+            // and is still tested -- it is the honest long-horizon number -- but two different
+            // units for one word in two places is how somebody concludes the app is broken.
+            stat("\(state.streakDays)", state.streakDays == 1 ? "day" : "days")
         }
         .padding(.vertical, Space.step)
         .sticker(fill: Ink.groundRaised)

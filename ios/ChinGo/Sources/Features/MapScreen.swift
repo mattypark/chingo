@@ -28,6 +28,7 @@ struct MapScreen: View {
     @State private var showCatch = false
     @State private var showAlbum = false
     @State private var showGlobe = false
+    @State private var showStreak = false
     /// Bumped by `-tour globe` to make the globe leave the way a thumb would. Always zero
     /// outside a debug run.
     @State private var globeLeaves = 0
@@ -539,6 +540,7 @@ struct MapScreen: View {
             case "profile": showProfile = true
             case "catch": catchMenu = true
             case "globe": showGlobe = true
+            case "streak": showStreak = true
             default: break
             }
 
@@ -606,6 +608,12 @@ struct MapScreen: View {
                 .presentationDetents([.height(470)])
                 .presentationCornerRadius(30)
         }
+        .sheet(isPresented: $showStreak) {
+            StreakSheet(state: state)
+                .presentationDetents([.height(470)])
+                .presentationBackground(Ink.ground)
+                .presentationCornerRadius(30)
+        }
         .sheet(isPresented: $showAlbum) {
             AlbumScreen()
         }
@@ -650,24 +658,56 @@ struct MapScreen: View {
 
     private var topBar: some View {
         HStack(spacing: 10) {
-            // Absent at zero rather than announcing it. A streak that can shame you is
-            // precisely the mechanic this app declined to copy; "0 weeks" in the corner of
-            // every screen is the shame with extra steps.
-            if state.streakWeeks > 0 {
-                FloatingPill {
-                    HStack(spacing: 6) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(accent.signal)
-                        Text("\(state.streakWeeks)")
-                            .font(.custom(Typeface.bagel, size: 14))
-                            .foregroundStyle(Ink.text)
-                        Text(state.streakWeeks == 1 ? "week" : "weeks")
-                            .font(.chinFootnote)
-                            .foregroundStyle(Ink.textSoft)
+            // Days now, not weeks. The comment that used to sit here said a streak which can
+            // shame you is precisely the mechanic this app declined to copy -- and that is
+            // still the rule, it is just no longer an argument against counting days. See
+            // `ChinGoEngine.Streak`, where the whole reversal is written down.
+            //
+            // What survives from it is this: absent at zero rather than announcing it. "0
+            // days" in the corner of every screen is the shame with extra steps, and it is the
+            // display that does the shaming rather than the unit.
+            //
+            // It is a button now. The one thing you can do about a streak -- spend a repair on
+            // it -- has to be reachable from the only place the streak is ever mentioned.
+            if state.streakDays > 0 || !state.repairableDays.isEmpty {
+                Button { showStreak = true } label: {
+                    FloatingPill {
+                        HStack(spacing: 6) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 12, weight: .bold))
+                                // Grey when the run is broken and only a repair would bring it
+                                // back. The pill is still there because there is something to
+                                // do, not because you are doing well.
+                                .foregroundStyle(state.streakDays > 0 ? accent.signal : Ink.textFaint)
+
+                            if state.streakDays > 0 {
+                                Text("\(state.streakDays)")
+                                    .font(.custom(Typeface.bagel, size: 14))
+                                    .foregroundStyle(Ink.text)
+                                    .contentTransition(.numericText())
+                                Text(state.streakDays == 1 ? "day" : "days")
+                                    .font(.chinFootnote)
+                                    .foregroundStyle(Ink.textSoft)
+                            } else {
+                                // Never "0 days". A zero in the corner of every screen is the
+                                // shame this app declined to copy, and it is the *display*
+                                // that does the shaming rather than the number -- so when
+                                // there is nothing to count, the pill asks instead of scoring.
+                                Text("Keep it?")
+                                    .font(.chinCallout)
+                                    .foregroundStyle(Ink.text)
+                            }
+                        }
                     }
                 }
-                .accessibilityLabel("\(state.streakWeeks) week streak")
+                .buttonStyle(SquashButtonStyle())
+                .accessibilityLabel(
+                    state.streakDays == 0
+                        ? "Your streak can still be repaired. Tap to look after it."
+                        : state.streakDays == 1
+                            ? "1 day streak. Tap to look after it."
+                            : "\(state.streakDays) day streak. Tap to look after it."
+                )
                 .transition(.scale.combined(with: .opacity))
             }
 
@@ -703,6 +743,7 @@ struct MapScreen: View {
             level: state.level,
             progress: state.levelProgress,
             glanceTowards: glanceBearing,
+            daysSinceMeetup: state.daysSinceMeetup,
             canCatch: state.canCatch,
             catchPulse: catchPulse,
             onProfile: {

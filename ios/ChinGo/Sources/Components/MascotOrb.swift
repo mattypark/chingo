@@ -45,6 +45,12 @@ struct MascotOrb: View {
     var progress: Double
     /// Screen-relative direction of the nearest thing worth noticing, in degrees, or nil.
     var glanceTowards: Double?
+    /// Days since you last met somebody. Nil when you never have.
+    ///
+    /// The bear is fed by the one thing this app is for, and by nothing else. There are no
+    /// chores here and there should not be: inventing a second currency to keep a character
+    /// happy is how an app about seeing people becomes an app about tapping a button.
+    var daysSinceMeetup: Int?
     /// Outside diameter. The ring is drawn inside it.
     var diameter: CGFloat = 46
 
@@ -65,6 +71,22 @@ struct MascotOrb: View {
     private enum Idle: CaseIterable {
         case breathe, swayLeft, swayRight, tiltLeft, tiltRight
         case bobUp, settle, perk, lean, shiver, sink, glanceUp
+
+        /// Whether this idle is one the bear only does when it has seen somebody lately.
+        ///
+        /// The split is the whole of "caring for the bear", and what it deliberately is *not*
+        /// is a sad bear. Finch's bird goes off on its own adventures while you are away and
+        /// is pleased to see you when you get back; it never mopes, and it cannot regress.
+        /// Copying the moping is how a companion becomes a debt.
+        ///
+        /// So a cold bear is not drooping — it is doing quieter, more inward things. Warm
+        /// adds the outward ones on top: perking up, bobbing, looking around for you.
+        var needsWarmth: Bool {
+            switch self {
+            case .perk, .bobUp, .glanceUp, .lean: true
+            default: false
+            }
+        }
 
         var scale: CGFloat {
             switch self {
@@ -212,13 +234,25 @@ struct MascotOrb: View {
         return max(-6, min(6, turn * 6))
     }
 
+    /// Whether the bear has seen anybody lately.
+    ///
+    /// Three days, because that is about the point at which "yesterday" stops being a useful
+    /// word for it. Never having met anybody counts as warm rather than cold: a brand-new
+    /// install has not lapsed, it has not started, and greeting somebody's first launch with
+    /// a subdued character is the worst possible first impression.
+    private var isWarm: Bool {
+        guard let daysSinceMeetup else { return true }
+        return daysSinceMeetup <= 3
+    }
+
     private func liveIdly() async {
         guard !Motion.reduceMotion else { return }
         var previous: Idle?
         while !Task.isCancelled {
             // Never the same idle twice running. One repeat is invisible; a loop of one is
             // what makes a character feel like a GIF.
-            let next = Idle.allCases.filter { $0 != previous }.randomElement() ?? .breathe
+            let available = Idle.allCases.filter { isWarm || !$0.needsWarmth }
+            let next = available.filter { $0 != previous }.randomElement() ?? .breathe
             previous = next
             idle = next
 
@@ -228,8 +262,10 @@ struct MascotOrb: View {
             try? await Task.sleep(for: .seconds(next.duration * 2))
             beat = false
             // A pause between idles. Constant motion is as lifeless as none — living things
-            // rest.
-            try? await Task.sleep(for: .seconds(Double.random(in: 1.4...3.6)))
+            // rest. A cold bear rests longer, which is the only other thing that changes: it
+            // is quieter, not unhappier.
+            let rest = isWarm ? 1.4...3.6 : 3.0...6.5
+            try? await Task.sleep(for: .seconds(Double.random(in: rest)))
         }
     }
 }

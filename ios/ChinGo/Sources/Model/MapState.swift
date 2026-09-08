@@ -25,6 +25,8 @@ final class MapState {
     /// Today, as a day ordinal. Held so the sheet can record a freeze in the same units the
     /// engine counts in without doing its own calendar arithmetic.
     var today: Int = 0
+    /// Days since you last met somebody, or nil if you never have. What the bear runs on.
+    var daysSinceMeetup: Int?
 
     /// Off by default, and per-session. Being findable is something you switch on when you
     /// go out, not a property of having installed the app.
@@ -91,6 +93,11 @@ final class MapState {
         today = Self.dayOrdinal(of: .now, in: calendar)
         let days = meetups.map { Self.dayOrdinal(of: $0.happenedAt, in: calendar) }
 
+        // Real meetups only, and deliberately not `frozenDays`. A freeze keeps the counter
+        // alive; it does not mean you saw anybody, and a bear cheered up by spending a repair
+        // would be a companion you can buy off.
+        daysSinceMeetup = days.max().map { today - $0 }
+
         streakDays = Streak.current(daysWithMeetup: days, frozenDays: frozenDays, today: today)
         repairableDays = Streak.repairable(
             daysWithMeetup: days,
@@ -105,7 +112,7 @@ final class MapState {
     /// `ordinality(of: .day, in: .era)` rather than day-of-year plus a year term: a run that
     /// crosses New Year has to be one continuous sequence, and `year * 366 + dayOfYear` leaves
     /// a hole at every turn of the year that reads as a broken streak on 1 January.
-    static func dayOrdinal(of date: Date, in calendar: Calendar) -> Int {
+    nonisolated static func dayOrdinal(of date: Date, in calendar: Calendar) -> Int {
         calendar.ordinality(of: .day, in: .era, for: date) ?? 0
     }
 }

@@ -23,6 +23,8 @@ struct HomeBar: View {
     var progress: Double
     /// Screen-relative direction of the nearest thing worth noticing. Drives the bear's lean.
     var glanceTowards: Double?
+    /// Days since you last met somebody. Drives which idles the bear has in it.
+    var daysSinceMeetup: Int?
     var canCatch: Bool
     /// Bumped by the owner when a hold commits, so the reward beat and haptic land there.
     var catchPulse: Int
@@ -96,7 +98,8 @@ struct HomeBar: View {
                 MascotOrb(
                     level: level,
                     progress: progress,
-                    glanceTowards: glanceTowards
+                    glanceTowards: glanceTowards,
+                    daysSinceMeetup: daysSinceMeetup
                 )
                 // The level moves out of the badge that used to hang off the orb and becomes
                 // a numeral beside it. A badge overhanging the bear needs room below the

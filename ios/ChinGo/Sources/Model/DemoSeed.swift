@@ -107,6 +107,65 @@ enum DemoSeed {
         return args[args.index(after: i)]
     }
 
+    /// `-streak lapsed|none` picks which streak the seeded history produces.
+    ///
+    /// The seeded friends were met 430, 210, 90 and 6 days ago, which is a realistic history
+    /// and produces no day streak whatsoever -- so the one screen that exists to show a streak
+    /// could only ever be looked at in its empty state. This adds a short run of recent
+    /// meetups and lets it be moved:
+    ///
+    /// - default: a live streak, so the pill and the sheet have a number in them.
+    /// - `lapsed`: the same run, pushed back so the last two days are missing. That is the
+    ///   only state where the repair button exists, and it cannot be reached by waiting.
+    /// - `none`: no recent meetups at all, which is a fresh install's real state.
+    /// - `repaired`: `lapsed`, with the gap already frozen and one repair spent. Proves the
+    ///   read path -- a stored freeze reaching the counter through the real store -- which
+    ///   the button's own tap cannot be made to do from the command line.
+    static var streak: String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-streak"), args.index(after: i) < args.endIndex else {
+            return nil
+        }
+        return args[args.index(after: i)]
+    }
+
+    /// A short run of recent meetups, so the streak is something that can be looked at.
+    private static func seedStreak(
+        into context: ModelContext,
+        around base: CLLocationCoordinate2D,
+        on handle: String
+    ) {
+        guard streak != "none" else { return }
+        // `repaired` is `lapsed` with the repair already spent, so it shares the shift.
+
+        let day = 60.0 * 60 * 24
+        // Shifted back by two days in the lapsed case, which leaves yesterday and the day
+        // before empty -- exactly the gap two repairs can bridge.
+        let shift = (streak == "lapsed" || streak == "repaired") ? 2.0 : 0
+        let descriptor = FetchDescriptor<FriendRecord>()
+        guard let friend = (try? context.fetch(descriptor))?.first(where: { $0.handle == handle })
+        else { return }
+
+        for offset in 0..<3 {
+            context.insert(
+                CatchRecord(
+                    kind: "snap",
+                    happenedAt: .now.addingTimeInterval(-day * (Double(offset) + shift)),
+                    cell: GeoCell(latitude: base.latitude, longitude: base.longitude).id,
+                    placeLabel: friend.metCity,
+                    friend: friend
+                )
+            )
+        }
+
+        guard streak == "repaired" else { return }
+        let today = MapState.dayOrdinal(of: .now, in: Calendar(identifier: .iso8601))
+        let identity = (try? context.fetch(FetchDescriptor<MeRecord>()))?.first
+        // Yesterday is the only day the shift leaves uncovered: the run ends the day before.
+        identity?.frozenDays = [today - 1]
+        identity?.freezesLeft = MeRecord.freezeAllowance - 1
+    }
+
     /// `-tour globe` opens the globe a beat after launch and leaves again a beat later.
     ///
     /// `-open globe` lands you inside it, which is the right flag for looking at the screen
@@ -290,6 +349,8 @@ enum DemoSeed {
                 )
             )
         }
+
+        seedStreak(into: context, around: base, on: people.first.map { $0.0 } ?? "sunny")
 
         // Memories scattered a few hundred metres out, so the map has something to place
         // and the distance maths is exercised rather than assumed.
