@@ -157,10 +157,17 @@ def main() -> None:
                 14, INK["building_warm"],
                 60, INK["building_side"],
             ],
-            # Height is purely data-driven, with no zoom interpolation wrapped around it.
-            # MapLibre refuses a zoom-interpolate whose OUTPUT is a data expression and
-            # drops the entire layer without an error -- which is why the buildings were
-            # invisible while everything else on the map rendered fine.
+            # Height is data-driven with no zoom term -- but not because MapLibre would
+            # reject one. An earlier comment here blamed a zoom-interpolate with a
+            # data-expression output for the buildings vanishing, and that was wrong: MapLibre
+            # 6.29 renders exactly that shape, and the client wraps this in one at runtime to
+            # clamp height up close (MapStyle.swift). What actually drops a layer silently is
+            # an UNRECOGNISED PAINT KEY. Adding the Mapbox-only `fill-extrusion-rounded-roof`
+            # made every building vanish with nothing in the log and no style error. A typo in
+            # a paint key is invisible, not loud.
+            #
+            # Height stays flat here so the zoom clamp has one owner. If it ever moves into
+            # this file, delete the MapStyle transform rather than fighting it.
             "fill-extrusion-height": [
                 "case", ["has", "render_height"], ["get", "render_height"], 5,
             ],
@@ -168,7 +175,6 @@ def main() -> None:
                 "case", ["has", "render_min_height"], ["get", "render_min_height"], 0,
             ],
             # Fade the solids in rather than having a city snap into existence at z14.
-            # Opacity may interpolate on zoom; height may not.
             "fill-extrusion-opacity": [
                 "interpolate", ["linear"], ["zoom"], 14, 0, 15.5, 0.95,
             ],

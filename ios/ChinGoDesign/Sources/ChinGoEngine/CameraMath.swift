@@ -18,9 +18,11 @@ public enum CameraMath {
     /// comes into view and the tiles run out behind it.
     public static let pitchRange: ClosedRange<Double> = 25...70
 
-    /// Below 15.5 the buildings stop extruding and the city becomes a road diagram; above 19
-    /// the z14 tiles are being overzoomed far enough that it stops looking deliberate.
-    public static let zoomRange: ClosedRange<Double> = 15.5...19
+    /// Below 15.5 the buildings stop extruding and the city becomes a road diagram. 20 is
+    /// where Pokémon GO sits. It overzooms the z14 tiles 64×, which is why this used to stop
+    /// at 19 — but the client now clamps building height up close and draws roads 1.75× wide,
+    /// and between them the overzoom is what a toy diorama looks like rather than a mistake.
+    public static let zoomRange: ClosedRange<Double> = 15.5...20
 
     /// Where a city opens. Close enough that the street you are standing on is the subject.
     public static let defaultZoom: Double = 17.2

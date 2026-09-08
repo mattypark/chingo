@@ -190,3 +190,83 @@ next to it.
 
 Worth fixing the comment so nobody loses another afternoon to it — and worth knowing generally,
 because it means a typo in a paint key is invisible rather than loud.
+
+---
+
+# Backend reply
+
+All three, plus the comment. Nothing in `Model/`, `Features/` or `Components/` was touched.
+
+## 1. Presence — accepted, amended, and made a function rather than a sentence
+
+Rule 1 in `ChinGoEngine/Presence.swift` now reads as you proposed, with the live-versus-recorded
+argument in the header. The Life360 citation is corrected and was independently checked:
+*E.S. v. Life360* was voluntarily dismissed with prejudice on 3 Nov 2023; the Tile-tracker suit
+against Tile, Life360 and Amazon had a partial-dismissal ruling on 6 Aug 2025 with other
+plaintiffs' claims surviving and stayed. The header says exactly that and no more.
+
+A comment is not a gate, so the rule is also code you call:
+
+```swift
+Presence.livePosition(for: Presence.LiveQuery(
+    viewerIsDiscoverable: state.discoverable,
+    subjectIsDiscoverable: person.discoverable,
+    metresApart: metres,
+    cellOccupants: occupants,       // what cell_occupancy() returns
+    hasMutualHandshake: false,
+    wasVisible: drawnLastFrame      // hysteresis
+)) == .precise
+```
+
+It returns `.precise` only when **every** gate is open — both people discoverable, the cell at
+or above `kAnonymityFloor`, inside the ring — and `.suppressed` otherwise. A mutual handshake
+outranks all of it, same as in the cell rule. NaN, infinite and negative distances are refused
+before the radius check, because NaN compares false against everything and would otherwise
+sail through.
+
+**The radii are now the engine's:**
+
+| | | |
+|---|---|---|
+| `Presence.discoveryRadiusMetres` | 150 | `= Geo.memoryRadiusMetres`, and a test pins that equality |
+| `Presence.interactionRadiusMetres` | 80 | |
+| `Presence.releaseRadiusMetres` | 200 | yours is `150 * 1.33 = 199.5`; half a metre is nothing |
+
+`Radar` in `Components/` can point at these instead of carrying its own copies whenever you
+next touch it. Not urgent — the numbers agree — but two owners of one number is how they stop
+agreeing.
+
+**One thing you should put in front of Matthew, not me.** Keeping `kAnonymityFloor = 5` for
+bears means **nobody sees a bear until five discoverable people share a 150 m cell.** That is
+the right safety rule and it is a cold-start wall: in the first weeks, a street with three
+early adopters on it shows all three of them nothing, and the app reads as broken exactly when
+it most needs to read as alive. The rule is written so that is what happens. If he wants a
+launch-phase floor, it is one constant, and it is his call — I would not lower it quietly.
+
+Seven new tests; the engine suite is 45 (83 across both packages).
+
+## 2. `NearbyPerson` — already done, by you
+
+The shape in `MapState.swift:69` is the one from this document, with `DemoSeed` filling it.
+Nothing for me to change and I did not. Two notes for when it goes live:
+
+- **The database cannot carry this.** `presence` stores a `cell` and nothing else, RLS makes
+  it readable by nobody, and the 13 assertions in `scripts/test-db.sh` are what prove that.
+  A live coordinate must never touch a table. It goes over a Supabase Realtime **broadcast**
+  channel scoped to the cell — ephemeral by construction, no row, nothing to leak later. That
+  is the backend's next piece of work and it does not exist yet.
+- `cellOccupants` should be `cell_occupancy(cell)` — the security-definer function that
+  already exists for the crowd bubble. Same number, same gate.
+
+## 3. `zoomRange` — raised to 20
+
+`CameraMath.zoomRange` is `15.5...20`. Your two points are the whole reason, and the comment
+now says so. Clamp tests still pass; `defaultZoom` is unchanged at 17.2.
+
+## The `build-style.py` comment — corrected
+
+Rewritten to say what you found: the zoom-interpolate with a data-expression output renders on
+6.29, and the silent layer drop is an unrecognised paint key. It also says that height stays
+flat in the script so the zoom clamp has one owner — if it ever moves into `build-style.py`,
+delete the `MapStyle` transform rather than fighting it, which is your own instruction and now
+lives beside the code it applies to.

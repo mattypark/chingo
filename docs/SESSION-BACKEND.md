@@ -112,7 +112,7 @@ print or commit a credential.
 
 Commit after every change. Never push unless asked.
 
-Current state: 43 engine tests and 13 RLS assertions pass. Build 0.1.0 (3) is on
+Current state: 45 engine tests (83 across both packages) and 13 RLS assertions pass. Build 0.1.0 (3) is on
 TestFlight and VALID. The internal group "Team" and the external group "Friends & Family"
 both exist, the privacy policy is live at
 https://mattypark.github.io/chingo/site/privacy.html, and What to Test is written. External
