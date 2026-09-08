@@ -34,6 +34,14 @@ struct MapScreen: View {
     /// Which step of the walk every bear is on. One counter for everybody: a crowd all
     /// stepping in time is a marching band, so each bear offsets from it by its own id.
     @State private var walkPhase = 0
+    /// Lets the reveal card find its bear on screen.
+    @State private var projection = MapProjection()
+    /// Who is currently revealed. Held rather than derived so it can hang on past the
+    /// interaction radius -- see `revealed`.
+    @State private var revealedID: String?
+    /// Bumped when somebody new comes into range, so the haptic fires on the crossing rather
+    /// than on every frame they stay there.
+    @State private var reveals = 0
     /// The photo currently flying into the album, if any.
     @State private var flying: UIImage?
     @State private var flown = false
@@ -78,6 +86,66 @@ struct MapScreen: View {
             }
     }
 
+    /// Roughly how tall a bear stands on screen, in points, at the zoom the map sits at.
+    /// Measured off the icon rather than derived: `BearIcons.side` is 192pt and the symbol
+    /// layer scales it to about 12% at zoom 18.
+    private static let bearHeight: CGFloat = 24
+
+    /// The nearest person inside the interaction ring, with hysteresis.
+    ///
+    /// Somebody already revealed stays revealed until they pass `Radar.releaseMetres`, a third
+    /// further out. Without that gap phone GPS drift alone flickers the card several times a
+    /// minute for anybody standing near the boundary.
+    private var revealed: NearbyPerson? {
+        if let held = revealedID,
+           let still = state.nearby.first(where: { $0.id == held }),
+           Double(still.approxMetres) <= Radar.releaseMetres {
+            return still
+        }
+        return state.nearby
+            .filter { Double($0.approxMetres) <= Radar.interactionMetres }
+            .min { $0.approxMetres < $1.approxMetres }
+    }
+
+    /// The card, over the bear it belongs to.
+    private var revealLayer: some View {
+        GeometryReader { geo in
+            if let person = revealed, let point = projection.point(for: person.coordinate) {
+                // Nudged inboard only far enough to stay on screen, with the stem left
+                // pointing at the bear. An earlier version also kept it clear of the nearby
+                // rail, which meant a bear near the right edge got a card 150pt away from
+                // it and a stem that could only reach 78 -- a line pointing at nothing.
+                // The rail steps aside instead; see `chrome`.
+                let half = RevealCard.width / 2
+                let left = Space.inset + half
+                let right = geo.size.width - Space.inset - half
+                let x = min(max(point.x, left), max(left, right))
+
+                RevealCard(
+                    person: person,
+                    stemOffset: point.x - x,
+                    onAdd: { showAddFriend = true },
+                    onCatch: { showCatch = true }
+                )
+                // Clear of the bear's head, not resting on it. The bear is anchored at its
+                // feet and stands about `bearHeight` tall at this zoom, and the stem hangs
+                // below the card, so the whole lot has to come off the top.
+                .position(x: x, y: point.y - Self.bearHeight - RevealCard.stem - 48)
+            }
+        }
+        // The map ignores the safe area and this has to be measured in the same space, or
+        // every card lands a status bar's height below the bear it belongs to.
+        .ignoresSafeArea()
+        // Reading `tick` is what re-runs this as the camera moves. Without it the card is
+        // placed once and then sits still while the map slides underneath it.
+        .id(projection.tick)
+        .feedback(.pick, on: reveals)
+        .onChange(of: revealed?.id) { previous, next in
+            revealedID = next
+            if next != nil, next != previous { reveals += 1 }
+        }
+    }
+
     private var here: (lat: Double, lon: Double) {
         let c = location.coordinateOrFallback
         return (c.latitude, c.longitude)
@@ -109,7 +177,8 @@ struct MapScreen: View {
                 radar: RadarState(
                     centre: location.coordinateOrFallback,
                     discoverable: state.discoverable
-                )
+                ),
+                projection: projection
             )
             .ignoresSafeArea()
 
@@ -149,12 +218,22 @@ struct MapScreen: View {
                 topBar
                 Spacer(minLength: Space.step)
                 NearbyRail(people: state.nearby, focused: $focusedNearby)
+                    // The rail and the card answer the same question at different scales --
+                    // who is around, versus who is here. When somebody is close enough to
+                    // photograph, the specific answer wins and the list gets out of its way.
+                    .opacity(revealed == nil ? 1 : 0)
+                    .animation(.easeOut(duration: 0.18), value: revealed?.id)
                 Spacer(minLength: Space.step)
                 bottomBar
             }
             .padding(.horizontal, Space.inset)
             .padding(.bottom, Space.margin)
             .opacity(catchMenu || deckMenu ? 0 : 1)
+
+            // Above the chrome, because it is the one thing on the map you are meant to act
+            // on the moment it appears.
+            revealLayer
+                .opacity(catchMenu || deckMenu ? 0 : 1)
 
             if deckMenu {
                 ListMenu(

@@ -40,6 +40,10 @@ struct MapLibreMap: UIViewRepresentable {
     /// The two ground rings, or nil before a position is known.
     var radar: RadarState?
 
+    /// Lets SwiftUI ask where a coordinate lands on screen. Needed by anything that has to
+    /// be a real view rather than a map symbol -- a card with buttons on it, mainly.
+    var projection: MapProjection?
+
     func makeUIView(context: Context) -> MLNMapView {
         // Not the bundled file directly: MapStyle corrects the palette the generated style
         // drifted from and washes the neutral family toward the player's accent.
@@ -83,6 +87,8 @@ struct MapLibreMap: UIViewRepresentable {
         map.attributionButtonPosition = .bottomLeft
         map.attributionButtonMargins = CGPoint(x: Space.inset, y: 132)
 
+        projection?.attach(map)
+        context.coordinator.projection = projection
         map.delegate = context.coordinator
         context.coordinator.aim = { map in camera(for: map, heading: bearing) }
         map.setCamera(camera(for: map, heading: bearing), animated: false)
@@ -104,7 +110,12 @@ struct MapLibreMap: UIViewRepresentable {
     /// time. Without a fix -- the simulator always, a real device indoors, anyone who declined
     /// location -- the map opens over the Atlantic and stays there. Re-aiming on
     /// `didFinishLoading` is what makes it open where the player is standing.
-    final class Coordinator: NSObject, MLNMapViewDelegate {
+    // `@preconcurrency` on the conformance: MapLibre calls this delegate on the main thread,
+    // but `MLNMapViewDelegate` is Objective-C and carries no isolation annotation, so Swift 6
+    // cannot see that. This asserts what the framework actually guarantees instead of
+    // scattering `assumeIsolated` through every callback.
+    @MainActor
+    final class Coordinator: NSObject, @preconcurrency MLNMapViewDelegate {
         /// `MLNMapView.zoomLevel` is derived from altitude and drifts by a hair, so comparing
         /// against it directly reports a change every frame.
         var lastZoom: Double = .nan
@@ -122,6 +133,17 @@ struct MapLibreMap: UIViewRepresentable {
         var radarSource: MLNShapeSource?
         /// The rings' own layers, kept so the hidden state can restyle them without a reload.
         var radarLines: [MLNLineStyleLayer] = []
+        var projection: MapProjection?
+
+        /// Fires on every rendered frame, including through inertia and camera animations,
+        /// which `regionIsChanging` does not. Anything positioned by projection has to be
+        /// recomputed here or it lags the map by a frame and reads as sliding on ice.
+        // MapLibre calls its delegate on the main thread but `MLNMapViewDelegate` is not
+        // annotated for it, so the whole coordinator is pinned to the main actor and the
+        // callback declared as satisfying the nonisolated requirement from there.
+        func mapViewDidFinishRenderingFrame(_ mapView: MLNMapView, fullyRendered: Bool) {
+            projection?.advance()
+        }
 
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
             installRadarLayers(into: style)
@@ -318,5 +340,34 @@ struct BearMark: Equatable {
             && a.icon == b.icon
             && a.coordinate.latitude == b.coordinate.latitude
             && a.coordinate.longitude == b.coordinate.longitude
+    }
+}
+
+
+/// Where a coordinate lands on screen.
+///
+/// The bears do not need this -- they are symbols inside the map's own frame, which is the
+/// whole reason they were built that way. This exists for the one thing that cannot be a map
+/// symbol: a card with buttons on it, which has to be a real view.
+///
+/// `tick` is bumped every rendered frame so SwiftUI recomputes positions in step with the
+/// map. That is a lot of invalidation, which is affordable only because at most one card is
+/// ever on screen.
+@MainActor
+@Observable
+final class MapProjection {
+    private weak var mapView: MLNMapView?
+    private(set) var tick = 0
+
+    func attach(_ map: MLNMapView) { mapView = map }
+
+    func advance() { tick &+= 1 }
+
+    /// Nil when the map is not up yet, or the coordinate is behind the camera.
+    func point(for coordinate: CLLocationCoordinate2D) -> CGPoint? {
+        guard let mapView else { return nil }
+        let point = mapView.convert(coordinate, toPointTo: mapView)
+        guard point.x.isFinite, point.y.isFinite else { return nil }
+        return point
     }
 }
