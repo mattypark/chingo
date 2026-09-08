@@ -26,10 +26,11 @@ struct OnboardingFlow: View {
     @State private var age = ""
     @State private var wantsLocation = false
     @State private var wantsNotifications = false
+    @State private var wantsGlobe = false
     @State private var blocked = false
 
     private enum Step: Int, CaseIterable {
-        case welcome, name, age, look, permissions, done
+        case welcome, name, age, look, permissions, friends, done
     }
 
     /// Where `-onboardStep` says to start. Release builds carry no flags, so this is always
@@ -41,6 +42,7 @@ struct OnboardingFlow: View {
         case "age": return .age
         case "look": return .look
         case "permissions", "location": return .permissions
+        case "friends": return .friends
         case "done", "safety": return .done
         default: return .welcome
         }
@@ -60,6 +62,7 @@ struct OnboardingFlow: View {
                 case .age: ageStep
                 case .look: look
                 case .permissions: permissions
+                case .friends: friends
                 case .done: done
                 }
             }
@@ -180,11 +183,14 @@ struct OnboardingFlow: View {
             primary: "Done",
             canAdvance: true
         ) {
-            advance(to: .done)
+            identity().globeEnabled = wantsGlobe
+            try? context.save()
+            advance(to: .friends)
         } answer: {
             PermissionList(
                 wantsLocation: $wantsLocation,
                 wantsNotifications: $wantsNotifications,
+                wantsGlobe: $wantsGlobe,
                 onLocation: {
                     location.requestPermission()
                 },
@@ -194,6 +200,50 @@ struct OnboardingFlow: View {
                     Task { await DevelopAlerts.requestPermission() }
                 }
             )
+        }
+    }
+
+    /// The last thing before the map: how you get your first person.
+    ///
+    /// Bump's version of this screen lists contacts who are already on the app with an Invite
+    /// button each. ChinGo cannot do that and should not want to. There is no contacts
+    /// permission -- the permissions screen deliberately does not ask for one -- and the whole
+    /// premise is that you catch people you are standing next to, so a list of phone contacts
+    /// would be suggesting friends by the one method the app exists to replace.
+    ///
+    /// What it does instead is the honest equivalent: hand over your handle. That is how the
+    /// first friendship in this app actually starts, and putting it here means the first thing
+    /// you do after onboarding is the thing the app is for.
+    private var friends: some View {
+        OnboardingQuestion(
+            question: "One more thing.",
+            primary: "Got it",
+            canAdvance: true,
+            footnote: "You can also add someone by their handle any time, from the catch button."
+        ) {
+            advance(to: .done)
+        } answer: {
+            VStack(spacing: Space.step) {
+                Text("This is you.")
+                    .font(.chinBody)
+                    .foregroundStyle(Ink.textSoft)
+
+                Text(cleanHandle.isEmpty ? "you" : cleanHandle)
+                    .font(.chinAnswer)
+                    .foregroundStyle(accentColour.onSignal)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.4)
+                    .padding(.horizontal, Space.inset)
+                    .padding(.vertical, Space.margin)
+                    .frame(maxWidth: .infinity)
+                    .sticker(fill: accentColour.signal, radius: Radius.surface)
+                    .padding(.trailing, Sticker.drop)
+
+                Text("Show it to somebody you're standing with and they can add you. That's the whole thing.")
+                    .font(.chinFootnote)
+                    .foregroundStyle(Ink.textSoft)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 
@@ -223,6 +273,10 @@ struct OnboardingFlow: View {
 
     /// Trimmed and lower-cased, because a handle is an address rather than a name. Two people
     /// typing "Sam" and "sam " are the same person to everybody who has to find them.
+    /// The chosen accent, resolved. The flow is not inside the environment that carries it,
+    /// because the record it is written to is being created on these very screens.
+    private var accentColour: Accent { Accent.at(accentChoice.wrappedValue) }
+
     private var cleanHandle: String {
         handle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }

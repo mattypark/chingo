@@ -23,6 +23,7 @@ struct PermissionList: View {
 
     @Binding var wantsLocation: Bool
     @Binding var wantsNotifications: Bool
+    @Binding var wantsGlobe: Bool
     var onLocation: () -> Void
     var onNotifications: () -> Void
 
@@ -41,6 +42,24 @@ struct PermissionList: View {
                 detail: "For when a photo develops.",
                 isOn: $wantsNotifications,
                 request: onNotifications
+            )
+            // The third row is not a system permission and deliberately does not ask for one.
+            //
+            // Bump's equivalent is "Always Allow — for your friends to see you", which is the
+            // background-location prompt. ChinGo does not ask for Always: `LocationService` is
+            // When-In-Use by design, and asking for permanent background location on a social
+            // map before there is a server that could do anything with it would be requesting
+            // a permission to hold rather than to use.
+            //
+            // So this switch turns the *feature* on, not the permission. It puts you on the
+            // globe for friends you have picked, both of you having said yes, and it is off by
+            // default like everything else in `GlobeSharing`.
+            row(
+                icon: "globe",
+                title: "Let friends see you",
+                detail: "On the globe — only people you pick, both ways.",
+                isOn: $wantsGlobe,
+                request: {}
             )
 
             // The safety line, which used to be a screen of its own. It is a caution, not a
