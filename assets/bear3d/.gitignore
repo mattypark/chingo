@@ -2,4 +2,4 @@
 # binary in git is a binary somebody edits by hand.
 bear.blend
 bear.blend1
-bear.usdz
+bear*.usdz

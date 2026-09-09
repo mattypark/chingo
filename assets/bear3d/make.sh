@@ -15,6 +15,13 @@ LOOK="${BEAR_LOOK_DIR:-$HOME/.claude/jobs/2c14c618/tmp/bear-look}"
 "$BLENDER" --background --python build_bear.py 2>&1 | grep -E "^BUILT|Error:" || true
 "$BLENDER" --background bear.blend --python export.py 2>&1 | grep -E "^EXPORTED|ERROR" || true
 
+# One USDZ per clip. USD has no multi-clip concept RealityKit reads back as named animations,
+# so packing them onto one timeline would put the timing in the app as frame numbers -- two
+# places to keep in step, which is one too many.
+for clip in walk idle sleep hug catch; do
+  "$BLENDER" --background bear.blend --python animate_bear.py -- "$clip" 2>&1     | grep -E "^CLIP|Error" || true
+done
+
 if [ "${1:-}" != "--quiet" ]; then
   "$BLENDER" --background bear.blend --python look.py -- "$LOOK" >/dev/null 2>&1
   ( cd "$LOOK" && ffmpeg -loglevel error -i front.png -i quarter.png -i side.png -i back.png \
