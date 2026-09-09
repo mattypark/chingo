@@ -33,6 +33,9 @@ struct MapScreen: View {
     /// last thing to arrive and the first to go.
     private var mapChrome: DrawnScreen { DrawnScreen(showGlobe ? 0 : 1, pieces: 2) }
     @State private var showStreak = false
+    #if DEBUG
+    @State private var showBears = false
+    #endif
     /// Bumped by `-tour globe` to make the globe leave the way a thumb would. Always zero
     /// outside a debug run.
     @State private var globeLeaves = 0
@@ -627,6 +630,7 @@ struct MapScreen: View {
             case "catch": catchMenu = true
             case "globe": showGlobe = true
             case "streak": showStreak = true
+            case "bears": showBears = true
             default: break
             }
 
@@ -711,6 +715,9 @@ struct MapScreen: View {
                 .presentationDetents([.height(470)])
                 .presentationCornerRadius(30)
         }
+        #if DEBUG
+        .sheet(isPresented: $showBears) { BearLab() }
+        #endif
         .sheet(isPresented: $showStreak) {
             StreakSheet(state: state)
                 .presentationDetents([.height(470)])

@@ -130,7 +130,7 @@ def blob(name, location, radius, scale=(1, 1, 1), mat=None):
 
 
 def build_mesh(body_mat, cream_mat, ink_mat):
-    """Every lump, in one mesh with three material slots."""
+    """Every lump, gathered into three named meshes -- body, cream and ink."""
     parts = []
 
     parts.append(blob("Body", (0, 0, BODY_Z), BODY_R, BODY_SCALE, body_mat))
@@ -160,26 +160,43 @@ def build_mesh(body_mat, cream_mat, ink_mat):
     parts.append(blob("Nose", (0, NOSE_Y, MUZZLE_Z + 0.03), NOSE_R, (1.0, 0.72, 0.8), ink_mat))
     parts.append(blob("Belly", (0, BELLY_Y, BELLY_Z), 1.0, BELLY, cream_mat))
 
-    # Join into one object. The slots survive, so the runtime still has a `Body` material to
-    # tint without having to hunt through a hierarchy of separate meshes.
-    bpy.ops.object.select_all(action="DESELECT")
-    for part in parts:
-        part.select_set(True)
-    bpy.context.view_layer.objects.active = parts[0]
-    bpy.ops.object.join()
+    # Joined into *three* objects, one per material, and named.
+    #
+    # The first version joined everything into one mesh with three material slots, and the app
+    # tinted slot 0. That put an array index into someone else's asset at the centre of the
+    # feature, and USD does not promise to hand the slots back in the order they went in — the
+    # bear came out of RealityKit with a coral body and no face at all, because the ink had
+    # been repainted along with the fur.
+    #
+    # Names survive the round trip and mean something. `BearBody` is the one that gets
+    # repainted per accent; the app looks it up by name and cannot hit the eyes by accident.
+    groups = {
+        "BearBody": [p for p in parts if p.data.materials and p.data.materials[0] == body_mat],
+        "BearCream": [p for p in parts if p.data.materials and p.data.materials[0] == cream_mat],
+        "BearInk": [p for p in parts if p.data.materials and p.data.materials[0] == ink_mat],
+    }
 
-    bear = bpy.context.active_object
-    bear.name = "Bear"
+    joined = []
+    for name, members in groups.items():
+        bpy.ops.object.select_all(action="DESELECT")
+        for member in members:
+            member.select_set(True)
+        bpy.context.view_layer.objects.active = members[0]
+        bpy.ops.object.join()
+        obj = bpy.context.active_object
+        obj.name = name
 
-    # One level of subdivision, not two. Two doubles the vertex count for a difference nobody
-    # sees at sixty points, on a screen already drawing a tilted vector map.
-    sub = bear.modifiers.new("Subdivision", "SUBSURF")
-    sub.levels = 1
-    sub.render_levels = 1
-    return bear
+        # One level of subdivision, not two. Two doubles the vertex count for a difference
+        # nobody sees at sixty points, on a screen already drawing a tilted vector map.
+        sub = obj.modifiers.new("Subdivision", "SUBSURF")
+        sub.levels = 1
+        sub.render_levels = 1
+        joined.append(obj)
+
+    return joined
 
 
-def build_armature(bear):
+def build_armature(meshes):
     """A skeleton with no joints in the limbs, because the character has none.
 
     Ten bones. The limbs rotate from where they meet the body and do not bend — a stub with an
@@ -224,7 +241,8 @@ def build_armature(bear):
     # Automatic weights. The parts barely overlap and the limbs are separate lumps, so the
     # heat-map solver has an easy job here — hand-painting would be work with no visible result.
     bpy.ops.object.select_all(action="DESELECT")
-    bear.select_set(True)
+    for mesh in meshes:
+        mesh.select_set(True)
     rig.select_set(True)
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.parent_set(type="ARMATURE_AUTO")
@@ -240,15 +258,22 @@ def main():
     cream = material("Cream", (0.988, 0.910, 0.749))
     ink = material("Ink", (0.110, 0.102, 0.086), roughness=0.45)
 
-    bear = build_mesh(body, cream, ink)
-    build_armature(bear)
+    meshes = build_mesh(body, cream, ink)
+    build_armature(meshes)
 
     # Beside this script, not beside the .blend. `bpy.path.abspath("//")` resolves against the
     # open file, and on a run that started from an empty scene there is no open file -- so it
     # answered with nothing and the bear was quietly saved into /tmp.
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bear.blend")
     bpy.ops.wm.save_as_mainfile(filepath=out)
-    print(f"BUILT bear.blend  verts={len(bear.data.vertices)}  slots={len(bear.data.materials)}")
+    # The app looks up `BearBody` by name to repaint it, so the name is part of the contract
+    # and is asserted rather than trusted -- renaming it here would ship a bear that quietly
+    # stopped taking the player's colour.
+    names = sorted(m.name for m in meshes)
+    assert names == ["BearBody", "BearCream", "BearInk"], f"mesh names changed: {names}"
+
+    verts = sum(len(m.data.vertices) for m in meshes)
+    print(f"BUILT bear.blend  verts={verts}  meshes={names}")
 
 
 main()
