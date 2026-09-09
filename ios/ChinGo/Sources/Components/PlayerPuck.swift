@@ -45,7 +45,12 @@ struct PlayerPuck: View {
 
     /// How tall the bear stands. Bigger than the ring on purpose: it is you, and you should be
     /// findable in a crowd of eight strangers without having to look for the ring.
-    private static let bearHeight: CGFloat = 58
+    /// How tall the bear stands on screen.
+    ///
+    /// 44, down from 58. At the old size the player loomed over the street they were standing
+    /// on -- a bear the height of the buildings beside it is a monster in a diorama rather
+    /// than somebody out for a walk.
+    private static let bearHeight: CGFloat = 44
 
     /// How far round the camera is from the bear's own heading, folded to +/-180.
     private var offAxis: Double {
@@ -75,12 +80,17 @@ struct PlayerPuck: View {
     /// to north: standing still and being stared at by the back of your own bear is worse than
     /// a bear that has not committed to a direction.
     private var worldFacing: Double {
-        guard let heading else { return 0 }
-        return heading - cameraBearing
+        // Held in the world, not toward the phone.
+        //
+        // Standing still used to return zero, which is "face the camera" -- so the bear turned
+        // with the view and you could never walk round it. It faces north when it has no
+        // course of its own, and the camera moves around that. Turn left and you see its
+        // profile, which is the entire reason it stopped being a drawing.
+        (heading ?? 0) - cameraBearing
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .top) {
             ZStack(alignment: .bottom) {
                 // The contact shadow, flat on the ground. This is what says "standing here"
                 // now that the disc has gone -- without it a bear on grass is a sticker on
@@ -106,21 +116,29 @@ struct PlayerPuck: View {
                     motion: phase == nil ? .idle : .walking,
                     facing: worldFacing
                 )
-                .frame(width: Self.bearHeight * 1.35, height: Self.bearHeight * 1.35)
-                .offset(y: -Self.bearHeight * 0.10)
+                // No lift. The scene now frames the bear with its feet on the bottom edge, so
+                // any offset here puts it back in the air above its own shadow.
+                .frame(width: Self.bearHeight * 1.25, height: Self.bearHeight * 1.25)
             }
             .frame(width: Self.bearHeight, height: Self.bearHeight, alignment: .bottom)
             .animation(.easeOut(duration: 0.18), value: turn)
 
-            // Sits under the feet rather than across the body.
+            // Above the head, not under the feet.
+            //
+            // Under the feet it sat between the bear and its shadow, which is the one place
+            // on a map that means "on the ground" -- so the number read as a thing lying in
+            // the street rather than as a label belonging to the player.
             Text("\(level)")
-                .font(.custom(Typeface.bagel, size: 12))
+                .font(.custom(Typeface.bagel, size: 11))
                 .foregroundStyle(accent.onSignal)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 2)
                 .background(Capsule().fill(accent.signal))
                 .overlay(Capsule().stroke(Ink.groundRaised, lineWidth: 2))
-                .offset(y: -4)
+                // Clear of the ears, not resting on them. The scene frames the bear with its
+                // feet on the bottom edge, so its head reaches the top of that frame and a
+                // badge merely "above centre" lands on the skull.
+                .offset(y: -26)
         }
         .scaleEffect(breathing ? 1.02 : 1, anchor: .bottom)
         .onAppear {

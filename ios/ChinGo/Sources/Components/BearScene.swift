@@ -77,7 +77,15 @@ struct BearScene: View {
                     camera.components.set(PerspectiveCameraComponent(
                         near: 0.05, far: 20, fieldOfViewInDegrees: 30
                     ))
-                    camera.position = [0, 0.52, 2.6]
+                    // Raised so the bear's *feet* land on the bottom edge of the view rather
+                    // than in the middle of it. At 30 degrees and 2.6 metres the camera sees
+                    // about 1.4m of height, so sitting it half that above the ground puts zero
+                    // at the bottom of the frame — and zero is where the model stands.
+                    //
+                    // With the camera centred on the bear instead, there was a band of empty
+                    // world under its feet inside the view, which on the map put the whole
+                    // bear above its own contact shadow. It read as floating, because it was.
+                    camera.position = [0, 0.695, 2.6]
                     content.add(camera)
 
                     loaded = bear

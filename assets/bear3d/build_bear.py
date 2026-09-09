@@ -79,6 +79,19 @@ SHINE_DX = -0.0135
 SHINE_DY = -0.020
 SHINE_DZ = 0.018
 
+# The smile: two short arcs meeting under the nose, angled into a shallow "w" the way the
+# drawing has it. Two lumps rather than a curve, because at the size the map draws a bear the
+# difference between a drawn arc and two tilted ellipsoids is nothing, and one of them is a
+# mesh you can build from the same primitive as everything else.
+MOUTH_R = 0.038
+MOUTH_DX = 0.030
+MOUTH_Z = 0.618
+# Far enough forward to clear the muzzle. The muzzle is an ellipsoid, so its front surface
+# recedes as you go up it -- raising the mouth toward the nose without pushing it forward buried
+# it completely, which is a shape that is perfectly present and perfectly invisible.
+MOUTH_Y = -0.363
+MOUTH_TILT = 17
+
 BELLY = (0.175, 0.09, 0.155)
 BELLY_Y = -0.20
 BELLY_Z = 0.31
@@ -117,7 +130,7 @@ def material(name, colour, roughness=0.62):
     return mat
 
 
-def blob(name, location, radius, scale=(1, 1, 1), mat=None):
+def blob(name, location, radius, scale=(1, 1, 1), mat=None, rotation=(0, 0, 0)):
     """One rounded lump.
 
     Everything here is a scaled sphere. That is not laziness — the character is drawn from
@@ -130,7 +143,8 @@ def blob(name, location, radius, scale=(1, 1, 1), mat=None):
     obj = bpy.context.active_object
     obj.name = name
     obj.scale = scale
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    obj.rotation_euler = [math.radians(a) for a in rotation]
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     bpy.ops.object.shade_smooth()
     if mat:
         obj.data.materials.append(mat)
@@ -169,6 +183,15 @@ def build_mesh(body_mat, cream_mat, ink_mat, shine_mat):
 
     parts.append(blob("Muzzle", (0, MUZZLE_Y, MUZZLE_Z), 1.0, MUZZLE, cream_mat))
     parts.append(blob("Nose", (0, NOSE_Y, MUZZLE_Z + 0.03), NOSE_R, (1.0, 0.72, 0.8), ink_mat))
+    for side, tag in ((-1, "L"), (1, "R")):
+        parts.append(blob(
+            f"Mouth{tag}", (side * MOUTH_DX, MOUTH_Y, MOUTH_Z),
+            MOUTH_R, (1.0, 0.22, 0.22), ink_mat,
+            # Outer ends *up*, middle dipping: a smile. The sign matters and it was wrong
+            # first -- tilted the other way the two halves make a peak in the middle with the
+            # ends falling away, which reads as a moustache on a face this round.
+            rotation=(0, -side * MOUTH_TILT, 0),
+        ))
     parts.append(blob("Belly", (0, BELLY_Y, BELLY_Z), 1.0, BELLY, cream_mat))
 
     # Joined into *three* objects, one per material, and named.
@@ -269,7 +292,10 @@ def main():
     # Berry, cream and ink — the shipped mascot's own colours. The body is replaced per player
     # at runtime; this is what it looks like before anybody has chosen.
     body = material("Body", (0.478, 0.180, 0.322))
-    cream = material("Cream", (0.988, 0.910, 0.749))
+    # Warmer than it was. At (0.988, 0.910, 0.749) the belly and muzzle read as *white* on a
+    # white ground rather than as cream, which is what Matthew saw -- the two-tone only works
+    # if the light half is a colour rather than an absence of one.
+    cream = material("Cream", (0.965, 0.865, 0.680))
     ink = material("Ink", (0.110, 0.102, 0.086), roughness=0.45)
     # Near-white and glossy. Far enough from berry that the app's colour match cannot mistake
     # it for fur and paint the catchlight the player's accent.

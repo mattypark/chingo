@@ -416,6 +416,9 @@ struct MapScreen: View {
                 // here rather than on the map, because MapLibre's own recognisers are all
                 // switched off and its symbol layers cannot report a tap without them.
                 .onTapGesture { point in reveal(nearest: point) }
+                // Double tap to come in. Declared alongside the single tap rather than
+                // instead of it -- SwiftUI resolves the count, so a reveal still works.
+                .onTapGesture(count: 2) { withAnimation(Motion.surface) { camera.step(1) } }
                 .ignoresSafeArea()
             // Above the map, below everything printed on it. The haze goes first: it is part
             // of the ground, and the sky has to be able to sit on top of where it ends.
@@ -531,12 +534,16 @@ struct MapScreen: View {
             // The globe, in the map's stack rather than over it in a presentation.
             //
             // Built only while it is open, so MapKit and MapLibre are not both running a
-            // camera when nobody is looking at one of them. `Ink.ground` underneath it because
-            // the globe's own map fades in, and without an opaque floor the first frames of
-            // that fade are two maps at once.
+            // camera when nobody is looking at one of them.
+            //
+            // **No floor under it.** There used to be an opaque `Ink.ground` here, so that the
+            // globe's own map could fade up over something rather than over the street. The
+            // cost was that the swap went white in the middle — a full-screen flash of paper
+            // between two maps, which is exactly what a drawn transition is supposed to avoid.
+            // The chrome un-draws over the street it was printed on, the globe draws itself on
+            // over the same street, and the two worlds cross-fade underneath. Nothing blanks.
             if showGlobe {
                 GlobeScreen(onClose: { withAnimation(Motion.draw) { showGlobe = false } }, leaveOn: globeLeaves)
-                    .background(Ink.ground.ignoresSafeArea())
                     .zIndex(1)
             }
 
@@ -867,6 +874,42 @@ struct MapScreen: View {
         }
     }
 
+    /// Plus and minus, stacked, above the compass.
+    ///
+    /// A pinch needs two fingers on glass, and there is no way to make one on a laptop
+    /// trackpad — so the map could be dragged and turned but never zoomed, which is most of
+    /// what a map is for. Double tap comes in; this is the pair that works with any input at
+    /// all, including a mouse.
+    ///
+    /// Deliberately small and quiet. It is a fallback rather than the primary way in, and
+    /// this screen's whole design is that controls are small objects floating over a map
+    /// rather than a frame around it.
+    private var zoomControl: some View {
+        VStack(spacing: 0) {
+            zoomStep("plus", by: 1)
+            Rectangle()
+                .fill(Ink.text)
+                .frame(width: 30, height: 3)
+            zoomStep("minus", by: -1)
+        }
+        .sticker(fill: Ink.groundRaised, radius: Radius.control)
+        .padding(.trailing, Sticker.drop)
+    }
+
+    private func zoomStep(_ icon: String, by direction: Double) -> some View {
+        Button {
+            withAnimation(Motion.surface) { camera.step(direction) }
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(Ink.text)
+                .frame(width: 36, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SquashButtonStyle())
+        .accessibilityLabel(direction > 0 ? "Zoom in" : "Zoom out")
+    }
+
     private var bottomBar: some View {
         HomeBar(
             level: state.level,
@@ -898,13 +941,17 @@ struct MapScreen: View {
             // do here. So they stack above the end of the bar instead.
             // Only the compass floats here now. The globe moved into the bar, and two doors
             // to the same place a thumb's width apart is one more than there should be.
-            if !camera.isFollowingCourse {
-                CompassRose(bearing: camera.bearing) {
-                    camera.recenter(course: location.course)
+            VStack(spacing: Space.tight) {
+                zoomControl
+
+                if !camera.isFollowingCourse {
+                    CompassRose(bearing: camera.bearing) {
+                        camera.recenter(course: location.course)
+                    }
+                    .transition(.scale.combined(with: .opacity))
                 }
-                .transition(.scale.combined(with: .opacity))
-                .offset(y: -Space.section)
             }
+            .offset(y: -Space.section)
         }
         .animation(Motion.surface, value: camera.isFollowingCourse)
     }

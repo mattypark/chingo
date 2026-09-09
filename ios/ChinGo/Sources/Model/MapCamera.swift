@@ -84,6 +84,19 @@ final class MapCamera {
         pinchOrigin = nil
     }
 
+    /// One step in or out, for the gestures that are not a pinch.
+    ///
+    /// Double tap to come in, two-finger tap to go out — Apple Maps' own pair, and the reason
+    /// they exist here is that a pinch needs two fingers on glass. On a laptop trackpad, in
+    /// the simulator, there are none: the map could be dragged and turned but never zoomed,
+    /// which is most of what a map is for. These work with one finger, a trackpad, or a mouse.
+    ///
+    /// Clamped by the same `CameraMath` bounds the pinch uses, so no route into the camera can
+    /// put it somewhere the other route would refuse to.
+    func step(_ direction: Double) {
+        zoom = CameraMath.zoom(from: zoom, pinchedBy: direction > 0 ? 1.9 : 1 / 1.9)
+    }
+
     /// Hand the camera back to the direction of travel.
     ///
     /// Zoom is deliberately left alone. Someone who zoomed out to get their bearings did not

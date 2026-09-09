@@ -86,8 +86,16 @@ struct RadarPulse: View {
                 // Reading `tick` is what re-measures the ellipse as the camera moves.
                 let _ = projection.tick
 
-                if discoverable {
+                // Drawn either way now, and dimmer when you are hidden.
+                //
+                // It used to switch off entirely, on the reasoning that a radar sweeping while
+                // nobody can see you says the opposite of what is true. The reasoning holds;
+                // the remedy was too blunt. The two still rings underneath already answer this
+                // by going dashed and dropping to 0.4 — the state stays legible and the screen
+                // does not die. The sweep follows the ring it belongs to.
+                do {
                     let now = timeline.date.timeIntervalSinceReferenceDate
+                    let strength = discoverable ? 1.0 : 0.34
 
                     ZStack {
                         ForEach(0..<Self.rings, id: \.self) { index in
@@ -98,7 +106,7 @@ struct RadarPulse: View {
                                     // Fades as it goes, and faster than it travels -- a ring
                                     // that is still bright when it arrives reads as a boundary
                                     // being drawn rather than as a signal that ran out of room.
-                                    .opacity((1 - phase) * 0.85)
+                                    .opacity((1 - phase) * 0.85 * strength)
                             }
                         }
                     }
