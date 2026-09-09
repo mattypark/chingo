@@ -46,6 +46,9 @@ struct GlobeScreen: View {
     /// back to them rather than doing nothing.
     @State private var focus: GlobePin?
     @State private var focusToken = 0
+    /// Bumped by the zoom control, with the direction it should move.
+    @State private var zoomToken = 0
+    @State private var zoomDirection: Double = 0
     @State private var managing = false
 
     private var identity: MeRecord? { me.first }
@@ -94,14 +97,18 @@ struct GlobeScreen: View {
                             projection: projection,
                             look: look,
                             focus: focus,
-                            focusToken: focusToken
+                            focusToken: focusToken,
+                            zoomToken: zoomToken,
+                            zoomDirection: zoomDirection
                         )
                     } else {
                         FlatGlobeMap(
                             accent: accent,
                             projection: projection,
                             focus: focus,
-                            focusToken: focusToken
+                            focusToken: focusToken,
+                            zoomToken: zoomToken,
+                            zoomDirection: zoomDirection
                         )
                     }
                 }
@@ -121,6 +128,15 @@ struct GlobeScreen: View {
             VStack(spacing: 0) {
                 topBar.pops(hidden: !appeared, rank: 0)
                 Spacer(minLength: 0)
+
+                // The same pair the street map has, for the same reason: both maps here zoom
+                // fine with two fingers on glass, and a laptop trackpad has none.
+                zoomControl
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.horizontal, Space.margin)
+                    .padding(.bottom, Space.snug)
+                    .pops(hidden: !appeared, rank: 1)
+
                 bottomBar.pops(hidden: !appeared, rank: 1)
             }
         }
@@ -345,6 +361,31 @@ struct GlobeScreen: View {
             .padding(.trailing, Sticker.drop)
             .padding(.bottom, Space.section)
         }
+    }
+
+    private var zoomControl: some View {
+        VStack(spacing: 0) {
+            zoomStep("plus", by: 1)
+            Rectangle().fill(Ink.text).frame(width: 30, height: 3)
+            zoomStep("minus", by: -1)
+        }
+        .sticker(fill: Ink.groundRaised, radius: Radius.control)
+        .padding(.trailing, Sticker.drop)
+    }
+
+    private func zoomStep(_ icon: String, by direction: Double) -> some View {
+        Button {
+            zoomDirection = direction
+            zoomToken += 1
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(Ink.text)
+                .frame(width: 36, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SquashButtonStyle())
+        .accessibilityLabel(direction > 0 ? "Zoom in" : "Zoom out")
     }
 
     /// 3pt, in ink, like every other line in this language.

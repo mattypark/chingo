@@ -57,6 +57,9 @@ struct GlobeMap: UIViewRepresentable {
     /// same person twice flies back to them rather than doing nothing.
     var focus: GlobePin?
     var focusToken: Int
+    /// Bumped to step the zoom, and the direction that step goes. See `FlatGlobeMap`.
+    var zoomToken: Int = 0
+    var zoomDirection: Double = 0
 
     /// Far enough out that MapKit switches to the globe.
     ///
@@ -100,6 +103,17 @@ struct GlobeMap: UIViewRepresentable {
             map.preferredConfiguration = look.configuration
         }
 
+        if context.coordinator.lastZoom != zoomToken {
+            context.coordinator.lastZoom = zoomToken
+            let camera = map.camera
+            // Altitude, because this one can be a sphere: a zoom level means nothing to a
+            // globe seen from orbit, and halving the distance to the ground does.
+            camera.centerCoordinateDistance = max(
+                4_000, camera.centerCoordinateDistance * (zoomDirection > 0 ? 0.45 : 2.2)
+            )
+            map.setCamera(camera, animated: true)
+        }
+
         if context.coordinator.lastFocus != focusToken {
             context.coordinator.lastFocus = focusToken
             if let focus {
@@ -128,6 +142,7 @@ struct GlobeMap: UIViewRepresentable {
         var parent: GlobeMap
         var lastFit = Int.min
         var lastFocus = Int.min
+        var lastZoom = 0
         var look: GlobeLook?
 
         init(_ parent: GlobeMap) { self.parent = parent }

@@ -27,6 +27,12 @@ struct FlatGlobeMap: UIViewRepresentable {
     var projection: GlobeProjection
     var focus: GlobePin?
     var focusToken: Int
+    /// Bumped to step the zoom, and the direction that step goes. Same shape as the other
+    /// tokens here: the view watches a counter rather than being told to do things, because
+    /// a `UIViewRepresentable` is re-made constantly and an imperative call would fire on
+    /// every rebuild.
+    var zoomToken: Int = 0
+    var zoomDirection: Double = 0
 
     func makeUIView(context: Context) -> MLNMapView {
         let map = MLNMapView(frame: .zero, styleURL: MapStyle.url(for: accent, kind: .flat))
@@ -63,6 +69,11 @@ struct FlatGlobeMap: UIViewRepresentable {
         context.coordinator.parent = self
         projection.attach(map)
 
+        if context.coordinator.lastZoom != zoomToken {
+            context.coordinator.lastZoom = zoomToken
+            map.setZoomLevel(map.zoomLevel + (zoomDirection > 0 ? 1.4 : -1.4), animated: true)
+        }
+
         if context.coordinator.lastFocus != focusToken {
             context.coordinator.lastFocus = focusToken
             if let focus {
@@ -78,6 +89,7 @@ struct FlatGlobeMap: UIViewRepresentable {
     final class Coordinator: NSObject, @preconcurrency MLNMapViewDelegate {
         var parent: FlatGlobeMap
         var lastFocus = Int.min
+        var lastZoom = 0
 
         init(_ parent: FlatGlobeMap) { self.parent = parent }
 

@@ -39,6 +39,11 @@ struct PlayerPuck: View {
     /// Which step of the walk to draw, or nil to stand still. Comes from the same counter the
     /// other bears use, so the whole map bobs at one tempo.
     var phase: Int?
+    /// Screen-relative direction of the nearest person, or nil when nobody is about.
+    ///
+    /// Only consulted while standing still. Walking somewhere and craning at a stranger is
+    /// two intentions at once, and the walk cycle is already saying the first one.
+    var glanceTowards: Double?
     /// Where the bear is facing in the world, in degrees. Nil holds it facing north.
     var heading: Double?
     /// Where the camera is looking, in degrees.
@@ -101,12 +106,39 @@ struct PlayerPuck: View {
         // the bear facing straight back at you while it walked away, which is the one pose a
         // walk cycle cannot survive. Half a turn puts its back to you when you are both going
         // the same way, and shows you its profile the moment you turn the map.
-        heldHeading - cameraBearing + 180
+        screenFacing + 180
+    }
+
+    /// Which way the bear is looking, in screen degrees, zero being up the screen.
+    ///
+    /// The plain answer, without the model's half turn. `worldFacing` adds 180 because the
+    /// model happens to face the camera at zero; the cone's wedge already opens away from the
+    /// viewer at zero, so handing it the model's number pointed the beam back down the screen
+    /// while the bear walked up it.
+    private var screenFacing: Double {
+        // Standing still, it turns to look at whoever is nearest -- which is the thing Matthew
+        // noticed the phone could already do and the bear could not. Walking, it looks where
+        // it is going and ignores them: a body going somewhere does not swivel at passers-by.
+        if phase == nil, let glanceTowards {
+            return glanceTowards
+        }
+        return heldHeading - cameraBearing
     }
 
     var body: some View {
         ZStack(alignment: .top) {
             ZStack(alignment: .bottom) {
+                // Under the bear and under its shadow: the beam falls on the road, and the
+                // bear stands on the road, so the bear is on top of it.
+                HeadingCone(
+                    facing: screenFacing,
+                    tint: accent.signal,
+                    reach: Self.bearHeight * 3.0
+                )
+                // Apex a little ahead of the feet. Struck exactly at them, the bear stands on
+                // top of the brightest part of its own beam and only the fringes show.
+                .offset(y: -Self.bearHeight * 0.22)
+
                 // The contact shadow, flat on the ground. This is what says "standing here"
                 // now that the disc has gone -- without it a bear on grass is a sticker on
                 // grass.

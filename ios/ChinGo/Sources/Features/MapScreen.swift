@@ -68,6 +68,21 @@ struct MapScreen: View {
     @State private var flying: UIImage?
     @State private var flown = false
 
+    /// Screen-relative direction of the nearest *person*, for the bear to turn toward.
+    ///
+    /// Sibling of `glanceBearing`, which does the same for memories and drives the small lean
+    /// in the home bar. This one turns the whole map bear, because a bear standing in the
+    /// street looking at nothing is the thing that makes a map feel empty even when it is not.
+    private var nearestPersonBearing: Double? {
+        guard let nearest = state.nearby.min(by: { $0.approxMetres < $1.approxMetres }) else {
+            return nil
+        }
+        let dLon = nearest.coordinate.longitude - here.lon
+        let dLat = nearest.coordinate.latitude - here.lat
+        guard abs(dLon) > 1e-9 || abs(dLat) > 1e-9 else { return nil }
+        return atan2(dLon, dLat) * 180 / .pi - camera.bearing
+    }
+
     /// Screen-relative direction of the nearest memory, for the bear to lean toward.
     ///
     /// Relative to the camera, not to north — the bear leans toward where the thing appears
@@ -445,6 +460,7 @@ struct MapScreen: View {
                 // threshold, so standing still is a genuine idle rather than a frozen
                 // walk frame -- the same rule every other bear on the map is drawn by.
                 phase: course == nil ? nil : walkPhase,
+                glanceTowards: nearestPersonBearing,
                 // The direction you are actually walking. `PlayerPuck` holds the last one, so
                 // standing still leaves the bear pointed where it was going rather than
                 // swinging to north.

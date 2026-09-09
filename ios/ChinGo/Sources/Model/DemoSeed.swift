@@ -2,6 +2,7 @@
 import CoreLocation
 import Foundation
 import SwiftData
+import UIKit
 import ChinGoDesign
 import ChinGoEngine
 
@@ -330,6 +331,16 @@ enum DemoSeed {
             "toby": (0, 0, 0, false, false, 6),
         ]
 
+        // A photo for some of them, so the globe pins can be seen doing what they do.
+        //
+        // Deliberately not all four. The pins prefer a real portrait and fall back to the
+        // person's bear, and both halves of that need to be visible at once -- a demo where
+        // everybody has a photo hides the fallback, and one where nobody does hides the
+        // feature. The alternate app icons stand in as photographs: they are already in the
+        // bundle, they are unmistakably different from each other, and none of them is the
+        // berry bear that would look like the fallback anyway.
+        let portraits = ["sunny": "IconPreview-Penguin", "jae": "IconPreview-Panda"]
+
         for (handle, city, meetups, places, daysAgo, top5, move, traits) in people {
             let friend = FriendRecord(
                 handle: handle,
@@ -361,6 +372,10 @@ enum DemoSeed {
                     friend: friend
                 )
             )
+
+            if let asset = portraits[handle], let image = UIImage(named: asset) {
+                friend.portraitFile = PhotoStore.savePortrait(image)
+            }
         }
 
         seedStreak(into: context, around: base, on: people.first.map { $0.0 } ?? "sunny")
