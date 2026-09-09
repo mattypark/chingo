@@ -267,16 +267,27 @@ struct GlobeScreen: View {
             if globeEnabled {
                 // Pause stays the loudest control up here. The way out of a location feature
                 // should never be the hardest thing to find in it.
+                // Says what it *is*, not what tapping it does.
+                //
+                // It read "Pause", which is a verb with no object -- pause what, and is it
+                // paused now or is that the button that would pause it. The map's own
+                // discoverability pill next door already solved this: a dot and a state word,
+                // "Out" or "Hidden". Same shape, same reading, one fewer thing to learn.
                 Button {
                     guard let identity else { return }
                     identity.sharingPaused.toggle()
                     try? context.save()
                 } label: {
-                    Text(paused ? "Paused" : "Pause")
-                        .font(.custom(Typeface.bagel, size: 14))
-                        .foregroundStyle(paused ? accent.onSignal : Ink.text)
-                        .padding(.horizontal, Space.snug)
-                        .padding(.vertical, Space.tight)
+                    HStack(spacing: 7) {
+                        Circle()
+                            .fill(paused ? Ink.textFaint : Ink.jade)
+                            .frame(width: 8, height: 8)
+                        Text(paused ? "Paused" : "Live")
+                            .font(.custom(Typeface.bagel, size: 14))
+                            .foregroundStyle(paused ? accent.onSignal : Ink.text)
+                    }
+                    .padding(.horizontal, Space.snug)
+                    .padding(.vertical, Space.tight)
                 }
                 .buttonStyle(
                     StickerButtonStyle(
@@ -285,6 +296,11 @@ struct GlobeScreen: View {
                     )
                 )
                 .hitTarget()
+                .accessibilityLabel(
+                    paused
+                        ? "Sharing is paused. Tap to share your place again."
+                        : "Sharing your place. Tap to pause it."
+                )
 
                 PortraitWell(portraitFile: identity?.portraitFile, diameter: 40)
             }
@@ -554,7 +570,13 @@ private struct GlobeToken: View {
         .frame(width: Self.face, height: Self.face)
         .background(Circle().fill(Accent.at(pin.accent).signalLift))
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(Ink.text, lineWidth: 3))
+        // The ring takes *their* colour, not ink.
+        //
+        // A deliberate departure from the 3pt-ink rule, and only here. On a map covered in
+        // identical circles the ring is the only thing carrying who somebody is at a glance --
+        // ink on every one of them makes a row of anonymous holes, and the photo inside is far
+        // too small at this size to tell two people apart.
+        .overlay(Circle().strokeBorder(Accent.at(pin.accent).signal, lineWidth: 4))
         .zIndex(2)
     }
 
@@ -566,11 +588,11 @@ private struct GlobeToken: View {
     private var stem: some View {
         ZStack(alignment: .bottom) {
             Rectangle()
-                .fill(Ink.text)
+                .fill(Accent.at(pin.accent).signal)
                 .frame(width: 3, height: Self.stem)
 
             Circle()
-                .fill(Ink.text)
+                .fill(Accent.at(pin.accent).signal)
                 .frame(width: 7, height: 7)
                 .offset(y: 3)
         }

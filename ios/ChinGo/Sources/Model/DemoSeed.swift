@@ -181,6 +181,19 @@ enum DemoSeed {
         return args[args.index(after: i)]
     }
 
+    /// `-walk 45` pretends you are walking on that bearing, in degrees.
+    ///
+    /// The simulator never moves, so `LocationService.course` is nil for the whole of every
+    /// run — which means the walk cycle, the bear's facing and everything downstream of "am I
+    /// moving" can only ever be seen by carrying a build outdoors. This forces a course.
+    static var walkCourse: Double? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-walk"), args.index(after: i) < args.endIndex else {
+            return nil
+        }
+        return Double(args[args.index(after: i)])
+    }
+
     /// `-autoSubmit` presses the question's own primary button a beat after it appears.
     ///
     /// Sibling of `-open`, and there for a stronger version of the same reason. `simctl` can

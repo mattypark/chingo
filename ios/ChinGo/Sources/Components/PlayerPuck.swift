@@ -32,6 +32,9 @@ import ChinGoDesign
 struct PlayerPuck: View {
     @Environment(\.accent) private var accent
 
+    /// The last direction actually travelled, in degrees. Survives standing still.
+    @State private var heldHeading: Double = 0
+
     var level: Int
     /// Which step of the walk to draw, or nil to stand still. Comes from the same counter the
     /// other bears use, so the whole map bobs at one tempo.
@@ -80,13 +83,25 @@ struct PlayerPuck: View {
     /// to north: standing still and being stared at by the back of your own bear is worse than
     /// a bear that has not committed to a direction.
     private var worldFacing: Double {
-        // Held in the world, not toward the phone.
+        // The way you last walked, held.
         //
-        // Standing still used to return zero, which is "face the camera" -- so the bear turned
-        // with the view and you could never walk round it. It faces north when it has no
-        // course of its own, and the camera moves around that. Turn left and you see its
-        // profile, which is the entire reason it stopped being a drawing.
-        (heading ?? 0) - cameraBearing
+        // This has been wrong twice in opposite directions. It returned zero when standing
+        // still, which is "face the camera" -- so the bear turned with the view and could
+        // never be walked round. Then it fell back to north, which is worse in motion: stop
+        // walking east and the bear swings to face north for no reason anybody watching could
+        // name.
+        //
+        // `course` is only published above a walking threshold, so it drops to nil every time
+        // you stand still. Holding the last one means the bear stays pointed where it was
+        // going, which is what a body does -- you do not rotate to true north when you stop.
+        //
+        // The 180 is the difference between "which way is the bear pointing in the world" and
+        // "which way is it pointing on this screen". The model faces the camera at zero, and
+        // the camera follows your course — so walking with the map lined up behind you left
+        // the bear facing straight back at you while it walked away, which is the one pose a
+        // walk cycle cannot survive. Half a turn puts its back to you when you are both going
+        // the same way, and shows you its profile the moment you turn the map.
+        heldHeading - cameraBearing + 180
     }
 
     var body: some View {
@@ -139,6 +154,11 @@ struct PlayerPuck: View {
                 // feet on the bottom edge, so its head reaches the top of that frame and a
                 // badge merely "above centre" lands on the skull.
                 .offset(y: -26)
+        }
+        .onChange(of: heading, initial: true) { _, course in
+            // Only ever updated by a real course. A nil is "not walking", not "walking north".
+            guard let course else { return }
+            withAnimation(Motion.surface) { heldHeading = course }
         }
         .scaleEffect(breathing ? 1.02 : 1, anchor: .bottom)
         .onAppear {

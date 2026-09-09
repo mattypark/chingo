@@ -444,10 +444,11 @@ struct MapScreen: View {
                 // Walks when you are walking. `course` is only published above a walking
                 // threshold, so standing still is a genuine idle rather than a frozen
                 // walk frame -- the same rule every other bear on the map is drawn by.
-                phase: location.course == nil ? nil : walkPhase,
-                // The direction you are actually walking, held while you stand still so the
-                // bear does not spin to face the phone every time the camera turns.
-                heading: location.course,
+                phase: course == nil ? nil : walkPhase,
+                // The direction you are actually walking. `PlayerPuck` holds the last one, so
+                // standing still leaves the bear pointed where it was going rather than
+                // swinging to north.
+                heading: course,
                 cameraBearing: camera.bearing
             )
 
@@ -675,8 +676,8 @@ struct MapScreen: View {
         // be pushed in -- the catch list has not moved and would not re-run the line above.
         .onChange(of: me.first?.frozenDays) { _, _ in refreshProgress() }
         .onChange(of: me.first?.awardedXP) { _, _ in refreshProgress() }
-        .onChange(of: location.course) { _, course in
-            camera.follow(course: course)
+        .onChange(of: course) { _, heading in
+            camera.follow(course: heading)
         }
         .sheet(item: $openMemory) { memory in
             MemorySheet(memory: memory) { reconnected() }
@@ -908,6 +909,16 @@ struct MapScreen: View {
         }
         .buttonStyle(SquashButtonStyle())
         .accessibilityLabel(direction > 0 ? "Zoom in" : "Zoom out")
+    }
+
+    /// The course to draw by: the real one, or the one a debug flag is pretending about.
+    ///
+    /// Release builds carry no flags, so this is always `location.course` outside a debug run.
+    private var course: CLLocationDirection? {
+        #if DEBUG
+        if let forced = DemoSeed.walkCourse { return forced }
+        #endif
+        return location.course
     }
 
     private var bottomBar: some View {
