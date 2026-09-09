@@ -1,0 +1,5 @@
+# Build products. `make.sh` regenerates both from build_bear.py in about six seconds, and a
+# binary in git is a binary somebody edits by hand.
+bear.blend
+bear.blend1
+bear.usdz
