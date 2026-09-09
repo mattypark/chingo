@@ -68,6 +68,17 @@ struct PlayerPuck: View {
     /// consistent side of the body as you circle.
     private var facing: CGFloat { offAxis < 0 ? -1 : 1 }
 
+    /// Where the bear is looking, relative to the camera.
+    ///
+    /// The heading is in the world and the camera turns independently, so the difference is
+    /// what the eye actually sees. Nil heading holds it facing the viewer rather than snapping
+    /// to north: standing still and being stared at by the back of your own bear is worse than
+    /// a bear that has not committed to a direction.
+    private var worldFacing: Double {
+        guard let heading else { return 0 }
+        return heading - cameraBearing
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .bottom) {
@@ -82,14 +93,21 @@ struct PlayerPuck: View {
                     .frame(width: Self.bearHeight * 0.78 * turn, height: Self.bearHeight * 0.17)
                     .offset(y: -2)
 
-                if let bear = BearIcons.all[BearIcons.name(accent: accent.id, phase: phase)] {
-                    Image(uiImage: bear)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: Self.bearHeight)
-                        .scaleEffect(x: turn * facing, y: 1, anchor: .bottom)
-                        .offset(y: -Self.bearHeight * 0.10)
-                }
+                // The real model, turned by a real rotation.
+                //
+                // What was here was one front-on drawing squashed horizontally and mirrored to
+                // fake a profile — which this file's own comment called a stand-in, because no
+                // amount of squashing a front view puts an ear in the right place. It has one
+                // now. The stranger bears on the map are still drawings: they are MapLibre
+                // symbols rendered in the map's own pass, and twenty of those cost nothing
+                // where twenty of these would not.
+                BearScene(
+                    accent: accent,
+                    motion: phase == nil ? .idle : .walking,
+                    facing: worldFacing
+                )
+                .frame(width: Self.bearHeight * 1.35, height: Self.bearHeight * 1.35)
+                .offset(y: -Self.bearHeight * 0.10)
             }
             .frame(width: Self.bearHeight, height: Self.bearHeight, alignment: .bottom)
             .animation(.easeOut(duration: 0.18), value: turn)

@@ -20,12 +20,27 @@ struct BearScene: View {
     var accent: Accent
     /// What the bear is doing.
     var motion: BearMotion
+    /// Which way the bear is facing, in degrees, relative to the camera. Zero looks at you.
+    ///
+    /// A real rotation, which is the whole reason this exists. The flat bear it replaces had
+    /// one front-on drawing and faked a profile with a horizontal squash and a mirror — that
+    /// reads at a glance and can never put an ear in the right place, as `PlayerPuck`'s own
+    /// comment admitted.
+    var facing: Double = 0
     /// How far through a hug, 0 to 1. Driven straight from a finger rather than played as a
     /// clip — see `BearMotion.hugging`.
     var hug: Double = 0
 
     @State private var loaded: Entity?
+    /// The parent the bear hangs off, so turning it does not fight the animation's own
+    /// transforms on the model.
+    @State private var turntable: Entity?
     @State private var failed = false
+
+    /// Degrees about the vertical, as a quaternion.
+    static func spin(_ degrees: Double) -> simd_quatf {
+        simd_quatf(angle: Float(degrees * .pi / 180), axis: [0, 1, 0])
+    }
 
     var body: some View {
         Group {
@@ -51,6 +66,8 @@ struct BearScene: View {
                     let anchor = Entity()
                     anchor.addChild(bear)
                     content.add(anchor)
+                    turntable = anchor
+                    anchor.orientation = BearScene.spin(facing)
 
                     // An explicit camera, because the default one frames the whole scene and
                     // the whole scene is a one-metre bear in an empty world -- which it framed
@@ -68,6 +85,7 @@ struct BearScene: View {
                     guard let loaded else { return }
                     BearAssets.tint(loaded, to: accent)
                     BearAssets.play(motion, on: loaded, hug: hug)
+                    turntable?.orientation = BearScene.spin(facing)
                 }
                 .realityViewCameraControls(.none)
             }
