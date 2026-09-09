@@ -71,6 +71,14 @@ EYE_X = 0.150
 EYE_Y = -0.285
 EYE_Z = 0.760
 
+# The catchlight. Both eyes get it in the same corner rather than mirrored, because a
+# highlight is a reflection of one light and mirroring it says there are two -- which reads as
+# wall-eyed rather than as shiny. Up and to the screen-left on both, matching the drawing.
+SHINE_R = 0.0145
+SHINE_DX = -0.0135
+SHINE_DY = -0.020
+SHINE_DZ = 0.018
+
 BELLY = (0.175, 0.09, 0.155)
 BELLY_Y = -0.20
 BELLY_Z = 0.31
@@ -129,7 +137,7 @@ def blob(name, location, radius, scale=(1, 1, 1), mat=None):
     return obj
 
 
-def build_mesh(body_mat, cream_mat, ink_mat):
+def build_mesh(body_mat, cream_mat, ink_mat, shine_mat):
     """Every lump, gathered into three named meshes -- body, cream and ink."""
     parts = []
 
@@ -155,6 +163,9 @@ def build_mesh(body_mat, cream_mat, ink_mat):
                           LEG_R * 0.66, (1.0, 0.4, 0.85), cream_mat))
         parts.append(blob(f"Eye{tag}", (side * EYE_X, EYE_Y, EYE_Z),
                           EYE_R, (1.0, 0.6, 1.3), ink_mat))
+        parts.append(blob(f"Shine{tag}",
+                          (side * EYE_X + SHINE_DX, EYE_Y + SHINE_DY, EYE_Z + SHINE_DZ),
+                          SHINE_R, (1.0, 0.7, 1.0), shine_mat))
 
     parts.append(blob("Muzzle", (0, MUZZLE_Y, MUZZLE_Z), 1.0, MUZZLE, cream_mat))
     parts.append(blob("Nose", (0, NOSE_Y, MUZZLE_Z + 0.03), NOSE_R, (1.0, 0.72, 0.8), ink_mat))
@@ -174,6 +185,9 @@ def build_mesh(body_mat, cream_mat, ink_mat):
         "BearBody": [p for p in parts if p.data.materials and p.data.materials[0] == body_mat],
         "BearCream": [p for p in parts if p.data.materials and p.data.materials[0] == cream_mat],
         "BearInk": [p for p in parts if p.data.materials and p.data.materials[0] == ink_mat],
+        # Its own mesh rather than folded into the cream, so the catchlight can stay pure white
+        # and slightly glossy while the muzzle and belly stay matte.
+        "BearShine": [p for p in parts if p.data.materials and p.data.materials[0] == shine_mat],
     }
 
     joined = []
@@ -257,8 +271,11 @@ def main():
     body = material("Body", (0.478, 0.180, 0.322))
     cream = material("Cream", (0.988, 0.910, 0.749))
     ink = material("Ink", (0.110, 0.102, 0.086), roughness=0.45)
+    # Near-white and glossy. Far enough from berry that the app's colour match cannot mistake
+    # it for fur and paint the catchlight the player's accent.
+    shine = material("Shine", (0.99, 0.99, 0.99), roughness=0.12)
 
-    meshes = build_mesh(body, cream, ink)
+    meshes = build_mesh(body, cream, ink, shine)
     build_armature(meshes)
 
     # Beside this script, not beside the .blend. `bpy.path.abspath("//")` resolves against the
@@ -270,7 +287,7 @@ def main():
     # and is asserted rather than trusted -- renaming it here would ship a bear that quietly
     # stopped taking the player's colour.
     names = sorted(m.name for m in meshes)
-    assert names == ["BearBody", "BearCream", "BearInk"], f"mesh names changed: {names}"
+    assert names == ["BearBody", "BearCream", "BearInk", "BearShine"], f"mesh names changed: {names}"
 
     verts = sum(len(m.data.vertices) for m in meshes)
     print(f"BUILT bear.blend  verts={verts}  meshes={names}")
